@@ -9,11 +9,11 @@
 
 **全自动、模块化的 Xray 部署脚本**
 
-[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/X-Reality#sponsor)
+[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/Xray-Reality#sponsor)
 
-[![GitHub release](https://img.shields.io/github/v/release/ISFZY/Xray-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/releases/latest) [![Downloads](https://img.shields.io/github/downloads/uxswl/X-Reality/total?style=flat-square)](https://github.com/uxswl/X-Reality/releases) [![Last Commit](https://img.shields.io/github/last-commit/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/commits/main) [![GitHub stars](https://img.shields.io/github/stars/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/stargazers) 
+[![GitHub release](https://img.shields.io/github/v/release/ISFZY/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases/latest) [![Downloads](https://img.shields.io/github/downloads/uxswl/X-Reality/total?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases) [![Last Commit](https://img.shields.io/github/last-commit/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/commits/main) [![GitHub stars](https://img.shields.io/github/stars/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/stargazers) 
 
-[![OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu-blue?style=flat-square&logo=linux&logoColor=white)](https://github.com/uxswl/X-Reality) [![Shell](https://img.shields.io/badge/Language-Shell-89E051?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/uxswl/X-Reality/search?l=Shell) [![License](https://img.shields.io/github/license/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/blob/main/LICENSE)
+[![OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu-blue?style=flat-square&logo=linux&logoColor=white)](https://github.com/uxswl/Xray-Reality) [![Shell](https://img.shields.io/badge/Language-Shell-89E051?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/uxswl/Xray-Reality/search?l=Shell) [![License](https://img.shields.io/github/license/uxswl/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/blob/main/LICENSE)
 
 本项目是一个高度模块化的 Shell 脚本，用于在 Linux 服务器上快速部署基于 **Xray** 核心的代理服务。支持最新的 **Vision** 和 **XHTTP** 协议，并集成了由 Reality 驱动的 SNI 伪装技术。
 
@@ -43,7 +43,7 @@
 使用 `root` 用户运行以下命令即可。引导脚本会自动安装 Git、克隆仓库并启动安装程序。
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/uxswl/X-Reality/main/bootstrap.sh)
+bash <(curl -sL https://raw.githubusercontent.com/uxswl/Xray-Reality/main/bootstrap.sh)
 
 ```
 
@@ -57,7 +57,7 @@ bash <(curl -sL https://raw.githubusercontent.com/uxswl/X-Reality/main/bootstrap
 apt update && apt install -y git
 
 # 2. 克隆仓库
-git clone https://github.com/uxswl/X-Reality.git xray-install
+git clone https://github.com/uxswl/Xray-Reality.git xray-install
 
 # 3. 运行脚本
 cd xray-install
@@ -71,7 +71,7 @@ chmod +x install.sh
 如果你想彻底移除 Xray 及相关配置，请运行（或服务端输入`remove`）：
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/uxswl/X-Reality/main/tools/remove.sh)
+bash <(curl -sL https://raw.githubusercontent.com/uxswl/Xray-Reality/main/tools/remove.sh)
 
 ```
 
@@ -241,11 +241,11 @@ DMIT分为三个网络类型，Premium (Pro)、Eyeball (Eb)、Tier1 (T1)，现�
 
 **Fully Automated, Modular Xray Deployment Script**
 
-[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/X-Reality#sponsor)
+[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/ISFZY/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/Xray-Reality#sponsor)
 
-[![GitHub release](https://img.shields.io/github/v/release/ISFZY/Xray-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/releases/latest) [![Downloads](https://img.shields.io/github/downloads/uxswl/X-Reality/total?style=flat-square)](https://github.com/uxswl/X-Reality/releases) [![Last Commit](https://img.shields.io/github/last-commit/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/commits/main) [![GitHub stars](https://img.shields.io/github/stars/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/stargazers) 
+[![GitHub release](https://img.shields.io/github/v/release/ISFZY/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases/latest) [![Downloads](https://img.shields.io/github/downloads/uxswl/X-Reality/total?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases) [![Last Commit](https://img.shields.io/github/last-commit/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/commits/main) [![GitHub stars](https://img.shields.io/github/stars/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/stargazers) 
 
-[![OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu-blue?style=flat-square&logo=linux&logoColor=white)](https://github.com/uxswl/X-Reality) [![Shell](https://img.shields.io/badge/Language-Shell-89E051?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/uxswl/X-Reality/search?l=Shell) [![License](https://img.shields.io/github/license/uxswl/X-Reality?style=flat-square)](https://github.com/uxswl/X-Reality/blob/main/LICENSE)
+[![OS](https://img.shields.io/badge/OS-Debian%20%7C%20Ubuntu-blue?style=flat-square&logo=linux&logoColor=white)](https://github.com/uxswl/Xray-Reality) [![Shell](https://img.shields.io/badge/Language-Shell-89E051?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/uxswl/Xray-Reality/search?l=Shell) [![License](https://img.shields.io/github/license/uxswl/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/blob/main/LICENSE)
 
 This project is a highly modular Shell script designed for the rapid deployment of proxy services based on the **Xray** core on Linux servers. It supports the latest **Vision** and **XHTTP** protocols and integrates SNI masking technology powered by Reality.
 
@@ -276,7 +276,7 @@ This project is a highly modular Shell script designed for the rapid deployment 
 Run the following command as the `root` user. The bootstrap script will automatically install Git, clone the repository, and start the installer.
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/uxswl/X-Reality/main/bootstrap.sh)
+bash <(curl -sL https://raw.githubusercontent.com/uxswl/Xray-Reality/main/bootstrap.sh)
 
 ```
 
@@ -288,7 +288,7 @@ If you cannot connect to GitHub Raw, you can try cloning manually:
 apt update && apt install -y git
 
 # 2. Clone the repository
-git clone https://github.com/uxswl/X-Reality.git xray-install
+git clone https://github.com/uxswl/Xray-Reality.git xray-install
 
 # 3. Run the script
 cd xray-install
@@ -303,7 +303,7 @@ chmod +x install.sh
 If you want to completely remove Xray and its related configurations, run the following (or type remove in the server terminal):
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/uxswl/X-Reality/main/tools/remove.sh)
+bash <(curl -sL https://raw.githubusercontent.com/uxswl/Xray-Reality/main/tools/remove.sh)
 
 ```
 
