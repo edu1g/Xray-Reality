@@ -46,12 +46,12 @@ execute_task() {
 
 # 6. Banner
 AUTHOR="uxswl"
-PROJECT_URL="https://github.com/uxswl/X-Reality"
+PROJECT_URL="https://github.com/uxswl/Xray-Reality"
 
 print_banner() {
     clear
     echo -e "${BLUE}===============================================================${PLAIN}"
-    echo -e "${BLUE}          X-Reality Installer                               ${PLAIN}"
+    echo -e "${BLUE}          Xray-Reality Installer                               ${PLAIN}"
     echo -e "${BLUE}===============================================================${PLAIN}"
     echo -e "${BLUE}Author  :${PLAIN} ${AUTHOR}"
     echo -e "${BLUE}Project :${PLAIN} ${PROJECT_URL}"
