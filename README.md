@@ -21,7 +21,7 @@
 
 ## ✨ 功能特性 (Features)
 
-* **📦 模块化设计**: 代码分为 Core、Lib、Tools 三大模块，逻辑清晰。
+* **📦 模块化设计**: 代码分为 Core、Lib、Tools 三大模块。
 * **🔒 最新协议**: 支持 Vision 和 XHTTP 协议，集成 Reality 伪装。
 * **🛡️ 安全加固**: 自动配置 Fail2ban 和防火墙。
 * **🛠️ 丰富工具箱**: 内置 WARP、BBR、端口管理、SNI 优选等工具。
