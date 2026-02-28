@@ -151,7 +151,7 @@ This repository includes a built-in GitHub Actions workflow that automatically f
 2. Click **"I understand my workflows, go ahead and enable them"** to activate GitHub Actions.
 3. Once enabled, the `Auto Sync Upstream` workflow will run automatically on schedule (you can also find it in the left sidebar to trigger it manually).
 
-
+<a id="sponsor"></a>
 ## 💖 Sponsor & Support
 
 This project is completely free and open-source. If you find this script helpful, if it saves you time, and you'd like to support ongoing development and server maintenance, consider using my aff! Your support is my greatest motivation.
