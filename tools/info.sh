@@ -92,7 +92,7 @@ if [[ -n "$LINK_V6_VIS" ]]; then
 fi
 
 # 二维码
-read -p "是否生成二维码? (y/n): " CHOICE
+read -p "是否生成二维码? (y/N): " CHOICE
 if [[ "$CHOICE" =~ ^[yY]$ ]]; then
     if [[ -n "$LINK_V4_VIS" ]]; then
         echo -e "\n${BLUE}--- IPv4 Vision ---${PLAIN}"
@@ -104,7 +104,7 @@ if [[ "$CHOICE" =~ ^[yY]$ ]]; then
     # 防止刷屏，IPv6 二维码依然需要二次确认
     if [[ -n "$LINK_V6_VIS" ]]; then
         echo ""
-        read -p "是否继续生成 IPv6 二维码? (y/n): " CHOICE_V6
+        read -p "是否继续生成 IPv6 二维码? (y/N): " CHOICE_V6
         if [[ "$CHOICE_V6" =~ ^[yY]$ ]]; then
             echo -e "\n${BLUE}--- IPv6 Vision ---${PLAIN}"
             qrencode -t ANSIUTF8 "${LINK_V6_VIS}"
