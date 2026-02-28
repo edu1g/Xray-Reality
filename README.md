@@ -8,7 +8,7 @@
 
 **全自动、模块化的 Xray 部署脚本**
 
-[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/Xray-Reality#sponsor1)
+[![Powered by Xray](https://img.shields.io/badge/Powered%20by-Xray--core-blue.svg?style=flat-square)](https://github.com/XTLS/Xray-core) [![404 Not Found](https://img.shields.io/badge/Censorship-404%20Not%20Found-red.svg?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![网络不是法外之地](https://img.shields.io/badge/警告-网络不是法外之地-ea4335?style=flat-square)](https://github.com/uxswl/Xray-Reality) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=flat-square)](https://github.com/uxswl/Xray-Reality#sponsor)
 
 [![GitHub release](https://img.shields.io/github/v/release/uxswl/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases/latest) [![Downloads](https://img.shields.io/github/downloads/uxswl/Xray-Reality/total?style=flat-square)](https://github.com/uxswl/Xray-Reality/releases) [![Last Commit](https://img.shields.io/github/last-commit/uxswl/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/commits/main) [![GitHub stars](https://img.shields.io/github/stars/uxswl/Xray-Reality?style=flat-square)](https://github.com/uxswl/Xray-Reality/stargazers) 
 
@@ -152,7 +152,7 @@ bash <(curl -sL https://raw.githubusercontent.com/uxswl/Xray-Reality/main/tools/
 3. 激活后，`Auto Sync Upstream` 工作流将按计划自动运行（您也可以在左侧工作流列表中找到它并手动触发同步）。
 
 
-<a id="sponsor1"></a>
+<a id="sponsor"></a>
 ## 💖 赞助与支持 (Sponsor)
 
 本项目完全免费开源。如果这个脚本对您有帮助，为您节省了配置时间，并且您愿意支持后续的开发与测试服务器维护，欢迎使用aff链接购买服务器！您的支持是我持续更新的最大动力。
