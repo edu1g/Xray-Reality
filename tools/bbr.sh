@@ -13,7 +13,7 @@ get_status() {
     local has_file=0
     [ -f "$SYSCTL_CONF" ] && has_file=1
 
-    # 四象限状态侦测逻辑
+    # 1. 四象限状态侦测逻辑
     if [ $has_file -eq 1 ]; then
         # 脚本介入状态
         if grep -q "tcp_mem" "$SYSCTL_CONF" 2>/dev/null; then
@@ -28,6 +28,14 @@ get_status() {
         else
             STATUS_MAIN="${GRAY}BBR 未启用 (系统默认)${PLAIN}"
         fi
+    fi
+
+    # 2. 看门狗状态侦测逻辑
+    local has_dog=$(crontab -l 2>/dev/null | grep -c "bbr_watchdog.sh")
+    if [ "$has_dog" -gt 0 ] && [ -f "/usr/local/bin/bbr_watchdog.sh" ]; then
+        STATUS_DOG="${GREEN}运行中${PLAIN}"
+    else
+        STATUS_DOG="${GRAY}未安装${PLAIN}"
     fi
 }
 
@@ -62,8 +70,53 @@ disable_bbr() {
     sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
     sysctl --system >/dev/null 2>&1
-    echo -e "${OK} ${GREEN}已恢复系统默认。${PLAIN}"
+    echo -e "${GREEN}已恢复系统默认。${PLAIN}"
     sleep 2
+}
+
+install_watchdog() {
+    echo -e "\n${BLUE}正在部署自动熔断看门狗...${PLAIN}"
+    
+    # 释放看门狗核心脚本 (使用 EOF_DOG 防止变量提前解析)
+    cat > /usr/local/bin/bbr_watchdog.sh << 'EOF_DOG'
+#!/bin/bash
+CRITICAL_RAM_PERCENT=95
+SYSCTL_CONF="/etc/sysctl.d/99-xray-bbr.conf"
+LOG_FILE="/var/log/bbr_watchdog_rescue.log"
+
+total_ram=$(free -m | awk '/^Mem:/{print $2}')
+avail_ram=$(free -m | awk '/^Mem:/{print $7}')
+used_percent=$(( (total_ram - avail_ram) * 100 / total_ram ))
+
+if [ "$used_percent" -ge "$CRITICAL_RAM_PERCENT" ]; then
+    if [ -f "$SYSCTL_CONF" ] && grep -q "tcp_mem" "$SYSCTL_CONF" 2>/dev/null; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 内存飙升至 ${used_percent}%！触发自动熔断机制！" >> "$LOG_FILE"
+        rm -f "$SYSCTL_CONF"
+        sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+        sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
+        sync; echo 3 > /proc/sys/vm/drop_caches
+        sysctl --system >/dev/null 2>&1
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 熔断成功。已恢复至系统默认值，防止 SSH 瘫痪。" >> "$LOG_FILE"
+    fi
+fi
+EOF_DOG
+
+    chmod +x /usr/local/bin/bbr_watchdog.sh
+    # 注入系统的定时任务 (每分钟运行一次，先剔除旧任务防重复)
+    (crontab -l 2>/dev/null | grep -v "bbr_watchdog.sh"; echo "* * * * * /usr/local/bin/bbr_watchdog.sh") | crontab -
+    
+    echo -e "${GREEN}部署成功！看门狗已潜入后台，正在全天候巡逻您的内存状态。${PLAIN}"
+    read -n 1 -s -r -p "按任意键返回..." 
+}
+
+uninstall_watchdog() {
+    echo -e "\n${BLUE}正在卸载自动熔断看门狗...${PLAIN}"
+    # 从定时任务中精准剔除
+    (crontab -l 2>/dev/null | grep -v "bbr_watchdog.sh") | crontab -
+    # 删除实体脚本
+    rm -f /usr/local/bin/bbr_watchdog.sh
+    echo -e "${GREEN}卸载完成！看门狗已停止工作并被清理。${PLAIN}"
+    read -n 1 -s -r -p "按任意键返回..." 
 }
 
 custom_tuning() {
@@ -87,7 +140,7 @@ custom_tuning() {
                 break
             else
                 echo -en "\033[1A\r\033[K"
-                echo -en "${ERR} ${RED}错误：必须输入正整数。${PLAIN}"
+                echo -en "${RED}错误：必须输入正整数。${PLAIN}"
                 sleep 1
                 echo -en "\r\033[K"
             fi
@@ -235,10 +288,14 @@ while true; do
     echo -e "${BLUE}          BBR 网络优化 (Network Manager)          ${PLAIN}\033[K"
     echo -e "${BLUE}===================================================${PLAIN}\033[K"
     echo -e "  当前状态 : ${STATUS_MAIN}\033[K"
+    echo -e "  看门狗   : ${STATUS_DOG}\033[K"
     echo -e "---------------------------------------------------\033[K"
-    echo -e "  1. ${GREEN}开启 BBR${PLAIN} (BBR+FQ+基础加固)\033[K"
-    echo -e "  2. ${YELLOW}关闭 BBR${PLAIN} (恢复系统默认)\033[K"
-    echo -e "  3. TCP 调优 (自定义)\033[K"
+    echo -e "  1. ${GREEN}开启 BBR${PLAIN}   (BBR+FQ+基础加固)\033[K"
+    echo -e "  2. ${YELLOW}关闭 BBR${PLAIN}   (恢复系统默认)\033[K"
+    echo -e "  3. ${BLUE}TCP 调优${PLAIN}   (自定义)\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  4. ${GREEN}安装看门狗${PLAIN} (防 OOM 自动熔断)\033[K"
+    echo -e "  5. ${RED}卸载看门狗${PLAIN}\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)\033[K"
     echo -e "\033[K"
@@ -246,10 +303,10 @@ while true; do
     tput ed
 
     while true; do
-        echo -ne "\r\033[K请输入选项 [0-3]: "
+        echo -ne "\r\033[K请输入选项 [0-5]: "
         read -r choice
         case "$choice" in
-            1|2|3|0) break ;;
+            1|2|3|4|5|0) break ;;
             *) echo -ne "\r\033[K${RED}输入无效...${PLAIN}"; sleep 0.5 ;;
         esac
     done
@@ -258,6 +315,8 @@ while true; do
         1) enable_bbr ;;
         2) disable_bbr ;;
         3) custom_tuning ;;
+        4) install_watchdog ;;
+        5) uninstall_watchdog ;;
         0) echo -e "\nbye.\033[K"; clear; exit 0 ;;
     esac
 done
