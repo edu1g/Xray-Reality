@@ -201,8 +201,13 @@ while true; do
         echo -ne "\r\033[K请输入选项 [0-5]: "
         read -r choice
         case "$choice" in
-            1|2|3|4|5|0) break ;;
-            *) echo -ne "\r\033[K${RED}输入无效...${PLAIN}"; sleep 0.5 ;;
+            1|2|3|4|5|0) 
+                break 
+                ;;
+            *) 
+                echo -ne "\033[1A\r\033[K${RED}输入无效，1秒后请重新输入...${PLAIN}"
+                sleep 1 
+                ;;
         esac
     done
 
