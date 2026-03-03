@@ -164,8 +164,24 @@ while true; do
     echo -e "  0. 退出"
     echo -e ""
     
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-2]: " choice
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-2]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-2]: "
+        fi
+        read -r choice
+        case "$choice" in
+            1|2|0) 
+                break
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
+        esac
+    done
 
         case "$choice" in
             1) manual_change; break ;; 

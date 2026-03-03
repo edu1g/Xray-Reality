@@ -112,13 +112,12 @@ _show_connection_info() {
 # 3. 查看用户详情
 view_user_details() {
     _print_list
-    echo -e "${YELLOW}提示: 输入序号 (ID) 查看详细连接信息${PLAIN} ${GREEN}[回车 或 0 返回]${PLAIN}"
 
     # 获取用户总数用于校验
     local len=$(jq '.inbounds[0].settings.clients | length' "$CONFIG_FILE")
 
     while true; do
-        read -p "序号 (ID): " idx
+        read -p "输入序号 (ID) 查看详细连接信息 [回车 或 0 返回]: " idx
 
         # --- 1. 退出逻辑 (回车或0) ---
         if [[ -z "$idx" || "$idx" == "0" ]]; then
@@ -186,7 +185,6 @@ restart_service() {
 # 5. 添加用户
 add_user() {
     echo -e "${BLUE}>>> 添加新用户${PLAIN}"
-    echo -e "${YELLOW}提示: 请输入新用户的备注名 (Alias)${PLAIN} ${GREEN}[回车 或 0 返回]${PLAIN}"
 
     # --- 外层循环：连续添加 (Loop 1) ---
     while true; do
@@ -194,7 +192,7 @@ add_user() {
         
         # --- 内层循环：输入验证 (Loop 2) ---
         while true; do
-            read -p "请输入用户备注 (例如: friend_bob)${GREEN}[回车 或 0 返回]${PLAIN}: " email
+            read -p "请输入用户备注 [回车 或 0 返回]: " email
 
             # 1. 退出逻辑 (回车 或 0)
             if [[ -z "$email" || "$email" == "0" ]]; then
@@ -250,14 +248,12 @@ del_user() {
              read -n 1 -s -r -p "按任意键返回菜单..."
              return
         fi
-
-        echo -e "${YELLOW}提示：请输入要删除的用户序号(ID)${PLAIN} ${GREEN}[回车 或 0 返回]${PLAIN}"
         
         local idx=""
         
         # --- 内层循环：ID 输入验证 ---
         while true; do
-            read -p "序号(ID): " idx
+            read -p "请输入要删除的用户序号(ID) [回车 或 0 返回]: " idx
             
             if [[ -z "$idx" || "$idx" == "0" ]]; then return; fi
 
@@ -322,13 +318,23 @@ while true; do
     echo -e ""
 
     # --- 验证循环 ---
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-3]: " choice
-        if [[ "$choice" =~ ^[0-3]$ ]]; then
-            break
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-3]: "
         else
-            echo -e "\033[1A\033[K${RED}输入无效: \"$choice\" 不是有效选项，请重新输入${PLAIN}"
+            echo -ne "\r\033[K请输入选项 [0-3]: "
         fi
+        read -r choice
+        case "$choice" in
+            1|2|3|0) 
+                break
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
+        esac
     done
 
     # --- 执行逻辑 ---

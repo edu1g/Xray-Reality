@@ -199,14 +199,21 @@ while true; do
     echo -e "  0. 退出"
     echo -e ""
     
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-3]: " choice
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-4]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-4]: "
+        fi
+        read -r choice
         case "$choice" in
-            0|1|2|3)
+            1|2|3|0) 
                 break
                 ;;
-            *)
-                print_error "输入错误：只能输入 0-3 之间的数字！"
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
                 ;;
         esac
     done

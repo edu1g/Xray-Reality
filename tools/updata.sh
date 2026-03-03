@@ -105,13 +105,27 @@ while true; do
     echo -e "  0. 退出 (Exit)"
     echo -e ""
 
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-2]: " choice
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-4]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-4]: "
+        fi
+        read -r choice
         case "$choice" in
-            1) update_core; break ;;
-            2) update_geodata; break ;;
-            0) clear; exit 0 ;;
-            *) echo -e "\033[1A\033[K${RED}输入无效，请重新输入${PLAIN}" ;;
+            1|2|0) 
+                break
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
         esac
     done
-done
+        case "$choice" in
+            1) update_core ;;
+            2) update_geodata ;;
+            0) clear; exit 0 ;;
+        esac
+    done

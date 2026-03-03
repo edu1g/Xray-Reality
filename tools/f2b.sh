@@ -558,25 +558,24 @@ menu_exponential() {
         echo -e ""
         
         # 2. 输入循环
-        local choice=""
-        while true; do
-
-            read -p "请选择 [0-3]: " choice
-            
-            # 正则校验：仅允许 0, 1, 2, 3
-            if [[ "$choice" =~ ^[0-3]$ ]]; then
-                echo "$choice"
+    error_msg=""
+    while true; do
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-3]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-3]: "
+        fi
+        read -r choice
+        case "$choice" in
+            1|2|3|0) 
                 break
-            else
-                # --- 错误处理逻辑 ---
-                echo "$choice"
-                
-                echo -ne "\033[1A\033[2K"
-                
-                echo -e "${RED}[错误] 输入无效: '$choice'${PLAIN}"
-                
-            fi
-        done
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
+        esac
+    done
         
         # 3. 执行逻辑
         case "$choice" in
@@ -595,6 +594,7 @@ menu_exponential() {
                 "封禁时长的最大值。\n      - 若不带单位，默认为秒 (s)。\n      - 支持单位: s, m, h, d, w。"
                 ;;
             0) return ;;
+            *) ;;
         esac
     done
 }
@@ -625,20 +625,23 @@ while true; do
     echo -e "  0. 退出"
     echo -e ""
     
-    # 2. 智能输入循环
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-8]: " choice
-        
-        # 校验是否为 0-8 的单数字
-        if [[ "$choice" =~ ^[0-8]$ ]]; then
-            break
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-8]: "
         else
-            # --- 核心逻辑：原地替换报错 ---
-            
-            echo "$choice"
-            echo -ne "\033[1A\033[2K"
-            echo -e "${RED}[错误] 输入无效: '$choice'，请重新输入。${PLAIN}"
+            echo -ne "\r\033[K请输入选项 [0-8]: "
         fi
+        read -r choice
+        case "$choice" in
+            1|2|3|4|5|6|7|8|0) 
+                break
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
+        esac
     done
 
     # 3. 功能执行
@@ -661,5 +664,6 @@ while true; do
         7) menu_exponential ;;
         8) toggle_service ;;
         0) clear; exit 0 ;;
+        *) ;;
     esac
 done

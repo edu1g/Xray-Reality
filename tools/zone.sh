@@ -14,22 +14,22 @@ get_time_status() {
     local ntp_active=$(timedatectl show -p NTP --value)
     local is_synced=$(timedatectl show -p NTPSynchronized --value)
     
-    echo -e "-------------------------------------------------"
-    echo -e "  当前时间 : ${YELLOW}$(date "+%Y-%m-%d %H:%M:%S")${PLAIN}"
-    echo -e "  当前时区 : ${GREEN}${tz}${PLAIN}"
+    echo -e "-------------------------------------------------\033[K"
+    echo -e "  当前时间 : ${YELLOW}$(date "+%Y-%m-%d %H:%M:%S")${PLAIN}\033[K"
+    echo -e "  当前时区 : ${GREEN}${tz}${PLAIN}\033[K"
     
     if [ "$ntp_active" == "yes" ]; then
-        echo -e "  自动同步 : ${GREEN}已开启 (Active)${PLAIN}"
+        echo -e "  自动同步 : ${GREEN}已开启 (Active)${PLAIN}\033[K"
     else
-        echo -e "  自动同步 : ${RED}已关闭 (Inactive)${PLAIN}"
+        echo -e "  自动同步 : ${RED}已关闭 (Inactive)${PLAIN}\033[K"
     fi
     
     if [ "$is_synced" == "yes" ]; then
-        echo -e "  同步状态 : ${GREEN}已校准 (Synced)${PLAIN}"
+        echo -e "  同步状态 : ${GREEN}已校准 (Synced)${PLAIN}\033[K"
     else
-        echo -e "  同步状态 : ${RED}未校准 / 偏差中${PLAIN}"
+        echo -e "  同步状态 : ${RED}未校准 / 偏差中${PLAIN}\033[K"
     fi
-    echo -e "-------------------------------------------------"
+    echo -e "-------------------------------------------------\033[K"
 }
 
 # 2. 设置时区
@@ -109,34 +109,39 @@ clear
 while true; do
 
     tput cup 0 0
-    echo -e "${BLUE}=================================================${PLAIN}"
-    echo -e "${BLUE}           系统时区与时间管理 (Zone Manager)     ${PLAIN}"
-    echo -e "${BLUE}=================================================${PLAIN}"
+    echo -e "${BLUE}=================================================${PLAIN}\033[K"
+    echo -e "${BLUE}           系统时区与时间管理 (Zone Manager)        ${PLAIN}\033[K"
+    echo -e "${BLUE}=================================================${PLAIN}\033[K"
     
     get_time_status
     
-    echo -e "  1. 设置为 ${GREEN}中国上海时间${PLAIN} (Asia/Shanghai)"
-    echo -e "  2. 设置为 ${GREEN}UTC 标准时间${PLAIN} (UTC)"
-    echo -e "  3. 设置为 ${YELLOW}自定义时区${PLAIN}"
-    echo -e "-------------------------------------------------"
-    echo -e "  4. ${BLUE}强制同步网络时间 (Sync NTP)${PLAIN}"
-    echo -e "-------------------------------------------------"
-    echo -e "  0. 退出 (Exit)          ${YELLOW}Enter/F. 刷新 (Refresh)${PLAIN}"
-    echo -e ""
+    echo -e "  1. 设置为 ${GREEN}中国上海时间${PLAIN} (Asia/Shanghai)\033[K"
+    echo -e "  2. 设置为 ${GREEN}UTC 标准时间${PLAIN} (UTC)          \033[K"
+    echo -e "  3. 设置为 ${YELLOW}自定义时区${PLAIN}                 \033[K"
+    echo -e "------------------------------------------------- \033[K"
+    echo -e "  4. ${BLUE}强制同步网络时间 (Sync NTP)${PLAIN}\033[K"
+    echo -e "-------------------------------------------------\033[K"
+    echo -e "  0. 退出 (Exit)          ${YELLOW}Enter/F. 刷新 (Refresh)${PLAIN}\033[K"
+    echo -e "\033[K"
     
     tput ed
 
     # --- 输入监听循环 ---
+    error_msg=""
     while true; do
-        read -p $'\r\033[K请输入选项 [0-4]: ' choice
-        
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项: "
+        else
+            echo -ne "\r\033[K请输入选项: "
+        fi
+        read -r choice
         case "$choice" in
             1|2|3|4|0|f|F|"") 
-                break 
+                break
                 ;;
             *) 
-                echo -ne "\r\033[K${RED}输入无效，请重新输入...${PLAIN}"
-                sleep 0.5
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
                 ;;
         esac
     done

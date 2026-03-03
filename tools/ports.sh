@@ -185,14 +185,21 @@ while true; do
     echo -e "  0. 退出 (Exit)"
     echo -e ""
     
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-3]: " choice
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-4]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-4]: "
+        fi
+        read -r choice
         case "$choice" in
-            1|2|3|0)
+            1|2|3|4|0) 
                 break
                 ;;
-            *)
-                echo -e "\r\033[K${RED}输入无效${PLAIN}"
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
                 ;;
         esac
     done
@@ -202,5 +209,6 @@ while true; do
         2) change_vision ;;
         3) change_xhttp ;;
         0) exit 0 ;;
+        *) ;;
     esac
 done

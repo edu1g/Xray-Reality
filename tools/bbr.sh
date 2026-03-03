@@ -197,16 +197,21 @@ while true; do
     
     tput ed
 
+    error_msg=""
     while true; do
-        echo -ne "\r\033[K请输入选项 [0-5]: "
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-5]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-5]: "
+        fi
         read -r choice
         case "$choice" in
             1|2|3|4|5|0) 
                 break 
                 ;;
             *) 
-                echo -ne "\033[1A\r\033[K${RED}输入无效，1秒后请重新输入...${PLAIN}"
-                sleep 1 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
                 ;;
         esac
     done
@@ -217,6 +222,6 @@ while true; do
         3) disable_bbr ;;
         4) install_watchdog ;;
         5) uninstall_watchdog ;;
-        0) echo -e "\nbye."; clear; exit 0 ;;
+        0) clear; exit 0 ;;
     esac
 done
