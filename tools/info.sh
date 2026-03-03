@@ -33,20 +33,20 @@ if [ -z "$PUBLIC_KEY" ]; then echo -e "${RED}严重错误：无法计算公钥�
 IPV4=$(curl -s4m 1 https://api.ipify.org || echo "N/A")
 IPV6=$(curl -s6m 1 https://api64.ipify.org || echo "N/A")
 
-# 生成 IPv4 链接
+# IPv4 链接
 LINK_V4_VIS=""
 LINK_V4_XHT=""
 if [[ "$IPV4" != "N/A" ]]; then
-    LINK_V4_VIS="vless://${UUID}@${IPV4}:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_Vision_IPv4"
-    LINK_V4_XHT="vless://${UUID}@${IPV4}:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_xhttp_IPv4"
+    LINK_V4_VIS="vless://${UUID}@${IPV4}:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv4_Vision"
+    LINK_V4_XHT="vless://${UUID}@${IPV4}:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv4_xhttp"
 fi
 
-# 生成 IPv6 链接
+# IPv6 链接
 LINK_V6_VIS=""
 LINK_V6_XHT=""
 if [[ "$IPV6" != "N/A" ]]; then
-    LINK_V6_VIS="vless://${UUID}@[${IPV6}]:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_Vision_IPv6"
-    LINK_V6_XHT="vless://${UUID}@[${IPV6}]:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_xhttp_IPv6"
+    LINK_V6_VIS="vless://${UUID}@[${IPV6}]:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv6_Vision"
+    LINK_V6_XHT="vless://${UUID}@[${IPV6}]:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv6_xhttp"
 fi
 
 # --- 3. 界面展示 ---
@@ -54,69 +54,66 @@ clear
 SEP="${BLUE}=====================================================================${PLAIN}"
 
 echo -e "${SEP}"
-echo -e "${BLUE} Xray 配置详情 (Dynamic Info) ${PLAIN}"
+echo -e "${BLUE} Xray 配置信息 (Info) ${PLAIN}"
 echo -e "${SEP}"
 
-printf " %-12s : ${RED}%s${PLAIN}\n"      "SSH"    "${SSH_PORT}"
-printf " %-12s : ${GREEN}%s${PLAIN}\n"    "IPv4"     "${IPV4}"
-printf " %-12s : ${GREEN}%s${PLAIN}\n"    "IPv6"     "${IPV6}"
-printf " %-12s : ${YELLOW}%s${PLAIN}\n"   "SNI"    "${SNI_HOST}"
-printf " %-12s : ${BLUE}%s${PLAIN}\n"     "UUID"        "${UUID}"
-printf " %-12s : ${BLUE}%s${PLAIN}\n"     "Short ID"    "${SHORT_ID}"
-printf " %-12s : ${YELLOW}%s${PLAIN} (客户端)\n" "Public Key"  "${PUBLIC_KEY}"
-printf " %-12s : ${RED}%s${PLAIN} (服务端)\n"    "Private Key" "${PRIVATE_KEY}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "SSH"         "${SSH_PORT}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "IPv4"        "${IPV4}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "IPv6"        "${IPV6}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "SNI"         "${SNI_HOST}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "UUID"        "${UUID}"
+printf " ${BLUE}%-12s${PLAIN} : %s\n"      "Short ID"    "${SHORT_ID}"
+printf " ${BLUE}%-12s${PLAIN} : %s (客户端)\n" "Public Key"  "${PUBLIC_KEY}"
+printf " ${BLUE}%-12s${PLAIN} : %s (服务端)\n" "Private Key" "${PRIVATE_KEY}"
 
 echo -e "${SEP}"
 
-printf " %-12s : 端口: ${GREEN}%-6s${PLAIN} 流控: ${GREEN}%-16s${PLAIN}\n" \
+printf " ${BLUE}%-12s${PLAIN} : ${BLUE}端口:${PLAIN} %-6s ${BLUE}流控:${PLAIN} %s\n" \
   "Vision" "${PORT_VISION}" "xtls-rprx-vision"
 
-printf " %-12s : 端口: ${GREEN}%-6s${PLAIN} 协议: ${GREEN}%-16s${PLAIN} Path: ${GREEN}%s${PLAIN}\n" \
+printf " ${BLUE}%-12s${PLAIN} : ${BLUE}端口:${PLAIN} %-6s ${BLUE}协议:${PLAIN} %-16s ${BLUE}Path:${PLAIN} %s\n" \
   "xhttp" "${PORT_XHTTP}" "xhttp" "${XHTTP_PATH}"
 
 echo -e "${SEP}"
 
 # 节点
 if [[ -n "$LINK_V4_VIS" ]]; then
-    echo -e "${GREEN}>> IPv4 节点 (通用):${PLAIN}"
-    echo -e "${YELLOW}Vision:${PLAIN} ${LINK_V4_VIS}"
-    echo -e "${YELLOW}XHTTP :${PLAIN} ${LINK_V4_XHT}"
+    echo -e "\n${BLUE}IPv4 Vision:${PLAIN}"
+    echo -e "${LINK_V4_VIS}"
+    echo -e "\n${BLUE}IPv4 XHTTP :${PLAIN}"
+    echo -e "${LINK_V4_XHT}"
     echo ""
 fi
 
 if [[ -n "$LINK_V6_VIS" ]]; then
-    echo -e "${GREEN}>> IPv6 节点 (专用):${PLAIN}"
-    echo -e "${YELLOW}Vision:${PLAIN} ${LINK_V6_VIS}"
-    echo -e "${YELLOW}XHTTP :${PLAIN} ${LINK_V6_XHT}"
+    echo -e "${BLUE}IPv6 Vision:${PLAIN}"
+    echo -e "${LINK_V6_VIS}"
+    echo -e "\n${BLUE}IPv6 XHTTP :${PLAIN}"
+    echo -e "${LINK_V6_XHT}"
     echo ""
 fi
 
 # 二维码
-read -p "是否生成二维码? (y/N): " CHOICE
+read -n 1 -p "是否展示二维码？[y/N] " CHOICE
+echo
 if [[ "$CHOICE" =~ ^[yY]$ ]]; then
     if [[ -n "$LINK_V4_VIS" ]]; then
-        echo -e "\n${BLUE}--- IPv4 Vision ---${PLAIN}"
+        echo -e "\n${BLUE}IPv4 Vision:${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V4_VIS}"
-        echo -e "\n${BLUE}--- IPv4 XHTTP ---${PLAIN}"
+        echo -e "\n${BLUE}IPv4 XHTTP :${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V4_XHT}"
     fi
-
-    # 防止刷屏，IPv6 二维码依然需要二次确认
     if [[ -n "$LINK_V6_VIS" ]]; then
-        echo ""
-        read -p "是否继续生成 IPv6 二维码? (y/N): " CHOICE_V6
-        if [[ "$CHOICE_V6" =~ ^[yY]$ ]]; then
-            echo -e "\n${BLUE}--- IPv6 Vision ---${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V6_VIS}"
-            echo -e "\n${BLUE}--- IPv6 XHTTP ---${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V6_XHT}"
-        fi
+        echo -e "\n${BLUE}IPv6 Vision:${PLAIN}"
+        qrencode -t ANSIUTF8 "${LINK_V6_VIS}"
+        echo -e "\n${BLUE}IPv6 XHTTP :${PLAIN}"
+        qrencode -t ANSIUTF8 "${LINK_V6_XHT}"
     fi
 fi
 
-echo -e "\n-----------------------------------------------------------------------------------------------------------------"
+echo -e "\n---------------------------------------------------------------------------------------------------------------------------------"
 echo -e " ${BLUE}管理命令:${PLAIN}"
 echo -e " ${YELLOW}info${PLAIN} (管理员信息) | ${YELLOW}net${PLAIN} (网络) | ${YELLOW}xw${PLAIN} (WARP分流) | ${YELLOW}swap${PLAIN}  (内存) | ${YELLOW}backup${PLAIN} (备份) | ${YELLOW}f2b${PLAIN} (防火墙) | ${YELLOW}sniff${PLAIN}  (流量嗅探)"
 echo -e " ${YELLOW}user${PLAIN} (多用户管理) | ${YELLOW}sni${PLAIN} (域名) | ${YELLOW}bt${PLAIN} (BT封禁)   | ${YELLOW}ports${PLAIN} (端口) | ${YELLOW}zone${PLAIN}   (时区) | ${YELLOW}bbr${PLAIN} (内核)   | ${YELLOW}updata${PLAIN} (内核更新) | ${YELLOW}remove${PLAIN} (卸载)"
-echo -e "-----------------------------------------------------------------------------------------------------------------"
+echo -e "---------------------------------------------------------------------------------------------------------------------------------"
 echo ""

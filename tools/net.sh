@@ -1,6 +1,7 @@
 #!/bin/bash
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; PLAIN="\033[0m"
 GRAY="\033[90m"
+UI_MESSAGE=""
 
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 GAI_CONF="/etc/gai.conf"
@@ -16,42 +17,33 @@ check_connectivity() {
     local ret_code=1
 
     if [ "$target_ver" == "v4" ]; then
-        # 优先尝试 Cloudflare (1.1.1.1)
         if curl -s4m 1 https://1.1.1.1 >/dev/null 2>&1; then
             return 0
-        # 备选尝试 Google (8.8.8.8) - 避免单点故障
         elif curl -s4m 1 https://8.8.8.8 >/dev/null 2>&1; then
             return 0
-        # 再次备选 OpenDNS (208.67.222.222)
         elif curl -s4m 1 https://208.67.222.222 >/dev/null 2>&1; then
             return 0
         fi
         
     elif [ "$target_ver" == "v6" ]; then
-        # 优先尝试 Cloudflare (2606:4700:4700::1111)
         if curl -s6m 1 https://2606:4700:4700::1111 >/dev/null 2>&1; then
             return 0
-        # 备选尝试 Google (2001:4860:4860::8888)
         elif curl -s6m 1 https://2001:4860:4860::8888 >/dev/null 2>&1; then
             return 0
         fi
     fi
 
-    # 如果所有靶点都失败，判定为无网络
     return 1
 }
 
-# 2. SSH 连接方式检测 (兼容 sudo)
+# 2. SSH 连接方式检测
 check_ssh_connection() {
-    # 优先尝试读取 SUDO_SSH_CLIENT (如果通过 sudo 运行)
     local client_info="${SUDO_SSH_CLIENT:-$SSH_CLIENT}"
     
-    # 如果还为空，尝试通过 who 命令获取 (兜底方案)
     if [ -z "$client_info" ]; then
         client_info=$(who -m 2>/dev/null | awk '{print $NF}' | tr -d '()')
     fi
 
-    # 判定逻辑：包含冒号 : 且不包含点 . (简单判定v6) 或者包含两个以上冒号
     if [[ "$client_info" =~ : ]]; then
         echo "v6"
     else
@@ -71,14 +63,12 @@ toggle_system_ipv6() {
             return 1
         fi
         
-        echo -e "${YELLOW}正在通过 sysctl 禁用 IPv6...${PLAIN}"
         sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null
         sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null
         # 持久化
         sed -i '/net.ipv6.conf.all.disable_ipv6/d' "$SYSCTL_CONF"
         echo "net.ipv6.conf.all.disable_ipv6 = 1" >> "$SYSCTL_CONF"
     else
-        echo -e "${GREEN}正在恢复系统 IPv6...${PLAIN}"
         sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null
         sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null
         sed -i '/net.ipv6.conf.all.disable_ipv6/d' "$SYSCTL_CONF"
@@ -89,7 +79,6 @@ toggle_system_ipv6() {
 # 4. 设置系统优先级 (gai.conf)
 set_system_prio() {
     [ ! -f "$GAI_CONF" ] && touch "$GAI_CONF"
-    # 清理旧规则
     sed -i '/^precedence ::ffff:0:0\/96  100/d' "$GAI_CONF"
     
     # 如果是 v4 优先，写入规则
@@ -107,7 +96,7 @@ apply_strategy() {
 
     # --- 执行系统级变更 ---
     if [ "$sys_action" == "v4_only" ]; then
-        if ! toggle_system_ipv6 "off"; then return; fi # 如果被拦截则停止
+        if ! toggle_system_ipv6 "off"; then return; fi
         set_system_prio "v4"
     elif [ "$sys_action" == "v6_only" ]; then
         toggle_system_ipv6 "on"
@@ -120,31 +109,22 @@ apply_strategy() {
 
     # --- 连通性复查 ---
     if [ "$xray_strategy" == "UseIPv4" ] && ! check_connectivity "v4"; then
-        echo -e "${RED}错误：本机无法连接 IPv4 网络，无法执行纯 IPv4 策略！${PLAIN}"
-        # 回滚系统设置
+        UI_MESSAGE="${RED}错误：本机无法连接 IPv4 网络，无法执行纯 IPv4 策略！${PLAIN}"
         toggle_system_ipv6 "on"
-        read -n 1 -s -r; return
+        return
     fi
 
     # --- 修改 Xray 配置 ---
-    echo -e "${BLUE}正在更新 Xray 配置...${PLAIN}"
-    
-    # 先确保 routing 对象存在 (防止 jq 报错)
     if [ -f "$CONFIG_FILE" ]; then
         tmp=$(mktemp)
-        # 1. 如果 routing 不存在，先创建它
         jq 'if .routing == null then .routing = {} else . end' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
-        # 2. 设置 domainStrategy
         jq --arg s "$xray_strategy" '.routing.domainStrategy = $s' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
         rm -f "$tmp"
-        
-        systemctl restart xray
-        echo -e "${GREEN}设置成功！当前运行模式: ${YELLOW}${desc}${PLAIN}"
+        systemctl restart xray >/dev/null 2>&1
+        UI_MESSAGE="${GREEN}设置成功：${desc}${PLAIN}"
     else
-        echo -e "${RED}错误：找不到配置文件 $CONFIG_FILE${PLAIN}"
+        UI_MESSAGE="${RED}错误：找不到配置文件 $CONFIG_FILE${PLAIN}"
     fi
-    
-    read -n 1 -s -r -p "按任意键继续..."
 }
 
 # 状态显示逻辑
@@ -195,16 +175,12 @@ get_current_status() {
     fi
 }
 
-# 交互菜单
-# 1. 首次清屏
+# 主菜单循环
 clear
-
 while true; do
-    # 获取最新状态
     get_current_status
     
-    # 2. 刷新菜单
-    echo -e "\033[H"
+    tput cup 0 0
     
     echo -e "${BLUE}================================================${PLAIN}\033[K"
     echo -e "${BLUE}           网络优先级切换 (Network Priority)    ${PLAIN}\033[K"
@@ -220,50 +196,42 @@ while true; do
     echo -e " 4. 仅 IPv6     ${GRAY}- 系统保留 IPv4 + Xray 强制 v6${PLAIN}\033[K"
     echo -e "------------------------------------------------\033[K"
     echo -e " 0. 退出\033[K"
-    echo -e "\033[K" 
+    echo -e "================================================\033[K"
+    if [ -n "$UI_MESSAGE" ]; then
+        echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
+    else
+        echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
+    fi
+    echo -e "================================================\033[K"
     
-    echo -e "\033[J"
+    tput ed
 
-    # 3. 交互逻辑
+    UI_MESSAGE=""
+    error_msg=""
     while true; do
-        read -p "请输入选项 [0-4]: " choice
-
-        # 退出逻辑
-        if [[ "$choice" == "0" ]]; then
-            exit 0
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-4]: "
+        else
+            echo -ne "\r\033[K请输入选项 [0-4]: "
         fi
-
-        # 验证逻辑
-        if [[ ! "$choice" =~ ^[1-4]$ ]]; then
-            # [错误处理]
-            echo -e "\033[1A\033[K${RED}输入无效: \"$choice\" 不是有效选项${PLAIN}"
-            sleep 0.5
-            echo -ne "\033[1A\033[K"
-            continue
-        fi
-
-        # 输入正确
-        local desc=""
+        read -r choice
         case "$choice" in
-            1) desc="IPv4 优先" ;;
-            2) desc="IPv6 优先" ;;
-            3) desc="纯 IPv4 模式" ;;
-            4) desc="纯 IPv6 模式" ;;
+            1|2|3|4|0) 
+                break
+                ;;
+            *) 
+                error_msg="输入无效！"
+                echo -ne "\033[1A"
+                ;;
         esac
-
-        # [成功提示]
-        echo -e "\033[1A\033[K${GREEN}>>> 选中: ${desc}，正在执行...${PLAIN}"
-        sleep 1
-        break
     done
 
-    # --- 4. 执行命令 ---
     case "$choice" in
         1) apply_strategy "v4_prio" "IPIfNonMatch" "IPv4 优先 (双栈)" ;;
         2) apply_strategy "v6_prio" "IPIfNonMatch" "IPv6 优先 (双栈)" ;;
         3) apply_strategy "v4_only" "UseIPv4"      "纯 IPv4 模式" ;;
         4) apply_strategy "v6_only" "UseIPv6"      "纯 IPv6 模式" ;;
+        0) clear; exit 0 ;;
+        *) ;;
     esac
-
-    sleep 0.5
 done
