@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 流量嗅探管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
@@ -7,8 +11,10 @@ UI_MESSAGE=""
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 LOG_FILE="/var/log/xray/access.log"
 
+# ─── 环境检查 ────────────────────────────────
 if ! command -v jq &> /dev/null; then echo -e "${RED}错误: 缺少 jq 组件。${PLAIN}"; exit 1; fi
 
+# ─── 状态读取 ────────────────────────────────
 get_sniff_status() {
     if [ ! -f "$CONFIG_FILE" ]; then echo "Error"; return; fi
     local status=$(jq -r '.inbounds[0].sniffing.enabled // false' "$CONFIG_FILE")
@@ -28,6 +34,7 @@ get_log_status() {
     fi
 }
 
+# ─── 流量嗅探开关 ────────────────────────────
 toggle_sniffing() {
     local current=$(jq -r '.inbounds[0].sniffing.enabled // false' "$CONFIG_FILE")
     local target_state
@@ -60,10 +67,10 @@ toggle_sniffing() {
 
         if systemctl is-active --quiet xray; then
             if [ "$target_state" == "true" ]; then
-            UI_MESSAGE="${GREEN}流量嗅探已开启${PLAIN}"
-        else
-            UI_MESSAGE="${YELLOW}流量嗅探已关闭${PLAIN}"
-        fi
+                UI_MESSAGE="${GREEN}流量嗅探已开启${PLAIN}"
+            else
+                UI_MESSAGE="${YELLOW}流量嗅探已关闭${PLAIN}"
+            fi
             rm -f "${CONFIG_FILE}.bak"
         else
             mv "${CONFIG_FILE}.bak" "$CONFIG_FILE"
@@ -81,6 +88,7 @@ toggle_sniffing() {
     fi
 }
 
+# ─── 访问日志开关 ────────────────────────────
 toggle_logging() {
     local access_path=$(jq -r '.log.access // ""' "$CONFIG_FILE")
     local action
@@ -103,16 +111,17 @@ toggle_logging() {
         chmod 644 "$CONFIG_FILE"
         systemctl restart xray >/dev/null 2>&1
         if [ "$action" == "on" ]; then
-        UI_MESSAGE="${GREEN}访问日志已开启${PLAIN}"
-    else
-        UI_MESSAGE="${YELLOW}访问日志已关闭${PLAIN}"
-    fi
+            UI_MESSAGE="${GREEN}访问日志已开启${PLAIN}"
+        else
+            UI_MESSAGE="${YELLOW}访问日志已关闭${PLAIN}"
+        fi
     else
         UI_MESSAGE="${RED}JSON 处理失败${PLAIN}"
         rm -f "$tmp"
     fi
 }
 
+# ─── 实时流量审计 ────────────────────────────
 trap 'trap - INT; return' INT
 watch_traffic() {
     local access_path=$(jq -r '.log.access // ""' "$CONFIG_FILE")
@@ -121,30 +130,31 @@ watch_traffic() {
         toggle_logging "on"
         sleep 1
     fi
-    
+
     clear
     echo -e "${GREEN}=================================================${PLAIN}"
     echo -e "${GREEN}        实时监视 (Ctrl+C 返回主菜单)${PLAIN}"
     echo -e "${GREEN}=================================================${PLAIN}"
     echo -e "Listening: ${YELLOW}$LOG_FILE${PLAIN}"
     echo ""
-    
+
     printf "${GRAY}%-15s %-22s %-25s %-63s %s${PLAIN}\n" "[Time]" "[Source IP]" "[Routing]" "[Destination]" "[User]"
     echo -e "${GRAY}---------------------------------------------------------------------------------------------------------------------------------------${PLAIN}"
-    
+
     tail -f "$LOG_FILE" | awk '{
         if ($5 == "accepted") {
             printf "\033[36m%-15s\033[0m \033[33m%-22s\033[0m \033[35m%-25s\033[0m \033[32m%-63s\033[0m \033[37m%s\033[0m\n", substr($2,1,12), $4, $7$8$9, $6, $11
         }
     }'
-	trap - INT
-	clear
+    trap - INT
+    clear
 }
 
+# ─── 菜单界面 ────────────────────────────────
 show_menu() {
     tput cup 0 0
     echo -e "${CYAN}=================================================${PLAIN}\033[K"
-    echo -e "${CYAN}          Xray 流量嗅探 (Sniffing)                    ${PLAIN}\033[K"
+    echo -e "${CYAN}          Xray 流量嗅探 (Sniffing)              ${PLAIN}\033[K"
     echo -e "${CYAN}=================================================${PLAIN}\033[K"
     echo -e " 流量嗅探: $(get_sniff_status)\033[K"
     echo -e " 日志记录: $(get_log_status)\033[K"
@@ -165,6 +175,7 @@ show_menu() {
     UI_MESSAGE=""
 }
 
+# ─── 主循环 ──────────────────────────────────
 clear
 while true; do
     show_menu
@@ -178,7 +189,7 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            [0-5]) break ;;
+            [0-3]) break ;;
             *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done

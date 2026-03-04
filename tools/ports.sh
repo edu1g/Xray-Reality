@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 端口管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
@@ -7,11 +11,13 @@ UI_MESSAGE=""
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 SSH_CONFIG="/etc/ssh/sshd_config"
 
+# ─── 环境检查 ────────────────────────────────
 if ! command -v jq &> /dev/null; then
     echo -e "${RED}错误: 缺少 jq 依赖。请运行 apt-get install jq 或 yum install jq${PLAIN}"
     exit 1
 fi
 
+# ─── 端口运行状态检测 ────────────────────────
 check_status() {
     local port=$1
     if ss -tulpn | grep -q ":${port} "; then
@@ -21,6 +27,7 @@ check_status() {
     fi
 }
 
+# ─── 防火墙放行端口 ──────────────────────────
 open_port() {
     local port=$1
     iptables -I INPUT -p tcp --dport $port -j ACCEPT
@@ -32,10 +39,11 @@ open_port() {
     netfilter-persistent save 2>/dev/null || service iptables save 2>/dev/null
 }
 
+# ─── 当前端口读取 ────────────────────────────
 get_ports() {
     CURRENT_SSH=$(grep "^Port" "$SSH_CONFIG" | head -n 1 | awk '{print $2}')
     [ -z "$CURRENT_SSH" ] && CURRENT_SSH=22
-    
+
     if [ -f "$CONFIG_FILE" ]; then
         CURRENT_VISION=$(jq -r '.inbounds[] | select(.tag=="vision_node") | .port' "$CONFIG_FILE")
         CURRENT_XHTTP=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .port' "$CONFIG_FILE")
@@ -44,6 +52,7 @@ get_ports() {
     fi
 }
 
+# ─── 端口输入与校验 ──────────────────────────
 input_and_validate() {
     local service_name="$1"
     local current_port="$2"
@@ -79,6 +88,7 @@ input_and_validate() {
     done
 }
 
+# ─── 修改 SSH 端口 ───────────────────────────
 change_ssh() {
     clear
     echo -e "${RED}################################################################${PLAIN}"
@@ -99,14 +109,8 @@ change_ssh() {
         read -r confirm
         case "$confirm" in
             [yY]) break ;;
-            [nN])
-                UI_MESSAGE="${YELLOW}SSH 端口修改已取消。${PLAIN}"
-                return
-                ;;
-            *)
-                confirm_error="错误：必须输入 y 或 n！"
-                echo -ne "\033[1A"
-                ;;
+            [nN]) UI_MESSAGE="${YELLOW}SSH 端口修改已取消。${PLAIN}"; return ;;
+            *) confirm_error="错误：必须输入 y 或 n！"; echo -ne "\033[1A" ;;
         esac
     done
 
@@ -131,6 +135,7 @@ change_ssh() {
     clear; printf '\033[3J'
 }
 
+# ─── 修改 Vision 端口 ────────────────────────
 change_vision() {
     clear
     echo ""
@@ -147,6 +152,7 @@ change_vision() {
     clear; printf '\033[3J'
 }
 
+# ─── 修改 XHTTP 端口 ─────────────────────────
 change_xhttp() {
     clear
     echo ""
@@ -163,22 +169,20 @@ change_xhttp() {
     clear; printf '\033[3J'
 }
 
-while true; do
-    get_ports
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
-
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "${CYAN}          端口管理面板 (Port Manager)             ${PLAIN}\033[K"
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  服务            端口(1-65535) 状态\033[K"
     echo -e "---------------------------------------------------\033[K"
-    printf "  1. 修改 SSH     ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_SSH" "$(check_status $CURRENT_SSH)"
+    printf "  1. 修改 SSH     ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_SSH"    "$(check_status $CURRENT_SSH)"
     printf "  2. 修改 Vision  ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_VISION" "$(check_status $CURRENT_VISION)"
-    printf "  3. 修改 XHTTP   ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_XHTTP" "$(check_status $CURRENT_XHTTP)"
+    printf "  3. 修改 XHTTP   ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_XHTTP"  "$(check_status $CURRENT_XHTTP)"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)\033[K"
     echo -e "===================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -186,8 +190,13 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "===================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    get_ports
+    show_menu
 
     error_msg=""
     while true; do
@@ -198,13 +207,8 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|3|0)
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|3|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 

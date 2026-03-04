@@ -1,15 +1,21 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray SNI 域名管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 
+# ─── 环境检查 ────────────────────────────────
 clear
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 if ! command -v jq &> /dev/null; then echo -e "${RED}错误: 缺少 jq 依赖。${PLAIN}"; exit 1; fi
 
+# ─── 当前 SNI 读取 ───────────────────────────
 get_current_sni() {
     if [ -f "$CONFIG_FILE" ]; then
         CURRENT_SNI=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0] // "获取失败"' "$CONFIG_FILE")
@@ -18,13 +24,14 @@ get_current_sni() {
     fi
 }
 
+# ─── SNI 应用 & 重启 ─────────────────────────
 apply_sni() {
     local new_domain=$1
 
     cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
 
     jq --arg d "$new_domain" '
-        (.inbounds[].streamSettings.realitySettings | select(. != null)) |= 
+        (.inbounds[].streamSettings.realitySettings | select(. != null)) |=
         (.serverNames = [$d] | .dest = ($d + ":443"))
     ' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
@@ -37,6 +44,7 @@ apply_sni() {
     fi
 }
 
+# ─── 手动修改 SNI ────────────────────────────
 manual_change() {
     clear
     echo -e "${CYAN}===================================================${PLAIN}"
@@ -68,6 +76,7 @@ manual_change() {
     done
 }
 
+# ─── 自动优选 SNI ────────────────────────────
 auto_select() {
     clear
     echo -e "${CYAN}===================================================${PLAIN}"
@@ -79,6 +88,7 @@ auto_select() {
     TEMP_FILE=$(mktemp)
     echo -e "  正在 Ping 检测..."
 
+    # ─── 延迟探测 ────────────────────────────
     tput civis
     for domain in "${DOMAINS[@]}"; do
         printf "\r   Ping: %-25s" "${domain}..."
@@ -93,6 +103,7 @@ auto_select() {
     tput cnorm
     echo -ne "\r\033[K"
 
+    # ─── 排序展示 ────────────────────────────
     echo -e "  延迟排序清单:"
     echo -e "---------------------------------------------------"
     SORTED_DOMAINS=()
@@ -137,10 +148,9 @@ auto_select() {
     done
 }
 
-while true; do
-    get_current_sni
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
-
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "${CYAN}          SNI 域名管理 (Reality Config)           ${PLAIN}\033[K"
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
@@ -151,7 +161,6 @@ while true; do
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)\033[K"
     echo -e "===================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -159,8 +168,13 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "===================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    get_current_sni
+    show_menu
 
     error_msg=""
     while true; do
@@ -171,13 +185,8 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|0)
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 

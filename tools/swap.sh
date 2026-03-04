@@ -1,11 +1,17 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  虚拟内存管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
+# ─── 环境检查 ────────────────────────────────
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 
+# ─── 输入校验工具 ────────────────────────────
 print_error() {
     local msg="$1"
     printf "\r\033[K${RED}%s${PLAIN}" "$msg"
@@ -51,6 +57,7 @@ get_valid_int() {
     done
 }
 
+# ─── 状态读取 ────────────────────────────────
 get_status() {
     SWAP_TOTAL=$(free -m | grep Swap | awk '{print $2}')
     if [ "$SWAP_TOTAL" -eq 0 ]; then
@@ -63,12 +70,12 @@ get_status() {
     if [ -z "$SWAPPINESS" ]; then
         SWAPPINESS=$(cat /proc/sys/vm/swappiness 2>/dev/null)
     fi
-    
     if [ -z "$SWAPPINESS" ]; then
         SWAPPINESS="${RED}读取失败${PLAIN}"
     fi
 }
 
+# ─── 添加 / 修改 Swap ────────────────────────
 add_swap() {
     clear
     echo -e "${CYAN}正在创建 Swap 分区...${PLAIN}"
@@ -107,6 +114,15 @@ add_swap() {
     clear; printf '\033[3J'
 }
 
+# ─── 关闭 / 删除 Swap ────────────────────────
+remove_swap() {
+    swapoff /swapfile 2>/dev/null
+    rm -f /swapfile
+    sed -i '/\/swapfile/d' /etc/fstab
+    UI_MESSAGE="${YELLOW}Swap 已关闭并删除。${PLAIN}"
+}
+
+# ─── 调整 Swappiness ─────────────────────────
 set_swappiness() {
     clear
     echo -e "${CYAN}调整 Swappiness 亲和度${PLAIN}"
@@ -130,10 +146,9 @@ set_swappiness() {
     clear; printf '\033[3J'
 }
 
-while true; do
-    get_status
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
-
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "${CYAN}           虚拟内存管理 (Swap Manager)            ${PLAIN}\033[K"
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
@@ -147,7 +162,6 @@ while true; do
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出\033[K"
     echo -e "===================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -155,8 +169,13 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "===================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    get_status
+    show_menu
 
     error_msg=""
     while true; do
@@ -167,24 +186,14 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|3|0)
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|3|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 
     case "$choice" in
         1) add_swap ;;
-        2)
-            swapoff /swapfile 2>/dev/null
-            rm -f /swapfile
-            sed -i '/\/swapfile/d' /etc/fstab
-            UI_MESSAGE="${YELLOW}Swap 已关闭并删除。${PLAIN}"
-            ;;
+        2) remove_swap ;;
         3) set_swappiness ;;
         0) clear; exit 0 ;;
     esac

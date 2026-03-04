@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 多用户管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
@@ -7,15 +11,17 @@ UI_MESSAGE=""
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 XRAY_BIN="/usr/local/bin/xray"
 
+# ─── 环境检查 ────────────────────────────────
 if ! command -v jq &> /dev/null; then echo -e "${RED}Error: 缺少 jq 组件。${PLAIN}"; exit 1; fi
 if ! [ -x "$XRAY_BIN" ]; then echo -e "${RED}Error: 缺少 xray 核心。${PLAIN}"; exit 1; fi
 
+# ─── 用户列表打印 ────────────────────────────
 _print_list() {
     echo -e "${CYAN}>>> 当前用户列表 (User List)${PLAIN}"
     echo -e "${GRAY}------------------------------------------------------------------${PLAIN}"
     printf "${YELLOW}%-5s %-25s %-40s${PLAIN}\n" "ID" "备注" "UUID"
     echo -e "${GRAY}------------------------------------------------------------------${PLAIN}"
-    
+
     jq -r '.inbounds[0].settings.clients | to_entries[] | "\(.key) \(.value.email // "无备注") \(.value.id)"' "$CONFIG_FILE" | while read idx email uuid; do
         if [ "$idx" -eq 0 ]; then
             printf "${RED}%-5s %-23s %-40s${PLAIN}\n" "#" "$email" "$uuid"
@@ -26,6 +32,7 @@ _print_list() {
     echo -e "${GRAY}------------------------------------------------------------------${PLAIN}"
 }
 
+# ─── 连接信息生成 ────────────────────────────
 _show_connection_info() {
     local target_uuid=$1
     local target_email=$2
@@ -35,7 +42,7 @@ _show_connection_info() {
     local PRIVATE_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey' "$CONFIG_FILE")
     local SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0]' "$CONFIG_FILE")
     local SNI_HOST=$(jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0]' "$CONFIG_FILE")
-    
+
     local PORT_VISION=$(jq -r '.inbounds[] | select(.tag=="vision_node") | .port' "$CONFIG_FILE")
     local PORT_XHTTP=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .port' "$CONFIG_FILE")
     local XHTTP_PATH=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .streamSettings.xhttpSettings.path' "$CONFIG_FILE")
@@ -45,8 +52,8 @@ _show_connection_info() {
         local RAW_OUTPUT=$($XRAY_BIN x25519 -i "$PRIVATE_KEY")
         PUBLIC_KEY=$(echo "$RAW_OUTPUT" | grep -iE "Public|Password" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
     fi
-    
-    if [ -z "$PUBLIC_KEY" ]; then 
+
+    if [ -z "$PUBLIC_KEY" ]; then
         echo -e "${RED}严重错误：无法计算公钥，请检查 config.json。${PLAIN}"
         return
     fi
@@ -60,12 +67,12 @@ _show_connection_info() {
         if [ -n "$PORT_VISION" ]; then
             local link="vless://${target_uuid}@${IPV4}:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv4_Vision"
             echo -e "${CYAN}IPv4 Vision:${PLAIN}"
-			echo "${link}$"
+            echo "${link}"
         fi
         if [ -n "$PORT_XHTTP" ]; then
             local link="vless://${target_uuid}@${IPV4}:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv4_xhttp"
             echo -e "${CYAN}IPv4 XHTTP :${PLAIN}"
-			echo "${link}$"
+            echo "${link}"
         fi
         echo ""
     fi
@@ -74,17 +81,18 @@ _show_connection_info() {
         if [ -n "$PORT_VISION" ]; then
             local link="vless://${target_uuid}@[${IPV6}]:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv6_Vision"
             echo -e "${CYAN}IPv6 Vision:${PLAIN}"
-			echo "${link}$"
+            echo "${link}"
         fi
         if [ -n "$PORT_XHTTP" ]; then
             local link="vless://${target_uuid}@[${IPV6}]:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv6_xhttp"
             echo -e "${CYAN}IPv6 XHTTP :${PLAIN}"
-			echo "${link}$"
+            echo "${link}"
         fi
         echo ""
     fi
 }
 
+# ─── 查看用户详情 ────────────────────────────
 view_user_details() {
     clear
     _print_list
@@ -100,9 +108,7 @@ view_user_details() {
         fi
         read -r idx
 
-        if [[ -z "$idx" || "$idx" == "0" ]]; then
-            return
-        fi
+        if [[ -z "$idx" || "$idx" == "0" ]]; then return; fi
 
         if ! [[ "$idx" =~ ^[0-9]+$ ]]; then
             error_msg="输入无效：\"$idx\" 不是数字！"
@@ -125,6 +131,7 @@ view_user_details() {
     done
 }
 
+# ─── 服务重启 & 自动回滚 ─────────────────────
 restart_service() {
     local backup_file="${CONFIG_FILE}.bak"
     chmod 644 "$CONFIG_FILE"
@@ -151,6 +158,7 @@ restart_service() {
     fi
 }
 
+# ─── 添加用户 ────────────────────────────────
 add_user() {
     clear
     echo -e "${CYAN}>>> 添加新用户${PLAIN}"
@@ -168,9 +176,7 @@ add_user() {
             fi
             read -r email
 
-            if [[ -z "$email" || "$email" == "0" ]]; then
-                return
-            fi
+            if [[ -z "$email" || "$email" == "0" ]]; then return; fi
 
             if grep -q "\"email\": \"$email\"" "$CONFIG_FILE"; then
                 error_msg="备注 \"$email\" 已存在，请换一个名字！"
@@ -215,6 +221,7 @@ add_user() {
     done
 }
 
+# ─── 删除用户 ────────────────────────────────
 del_user() {
     clear
     _print_list
@@ -259,6 +266,7 @@ del_user() {
         local email=$(jq -r ".inbounds[0].settings.clients[$idx].email // \"无备注\"" "$CONFIG_FILE")
         local confirm_error=""
 
+        # ─── 二次确认 ────────────────────────
         while true; do
             if [ -n "$confirm_error" ]; then
                 echo -ne "\r\033[K${RED}${confirm_error}${PLAIN} 确认删除用户 ${RED}${email}${PLAIN}？[y/n]: "
@@ -300,9 +308,9 @@ del_user() {
     done
 }
 
-while true; do
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
-
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "${CYAN}              多用户管理 (User Manager)           ${PLAIN}\033[K"
     echo -e "${CYAN}===================================================${PLAIN}\033[K"
@@ -312,7 +320,6 @@ while true; do
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出\033[K"
     echo -e "===================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -320,8 +327,12 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "===================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    show_menu
 
     error_msg=""
     while true; do
@@ -332,13 +343,8 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|3|0)
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|3|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 配置备份与还原管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
@@ -11,6 +15,7 @@ ASSET_DIR="/usr/local/share/xray"
 
 mkdir -p "$BACKUP_DIR"
 
+# ─── 创建备份 ────────────────────────────────
 create_backup() {
     if [ ! -f "$CONFIG_FILE" ]; then
         UI_MESSAGE="${RED}错误：找不到配置文件，无法备份${PLAIN}"
@@ -35,6 +40,7 @@ create_backup() {
     fi
 }
 
+# ─── 还原备份 ────────────────────────────────
 restore_backup() {
     local files=($(ls -t "$BACKUP_DIR"/config_*.json 2>/dev/null))
 
@@ -91,6 +97,7 @@ restore_backup() {
     echo -e "\n您选择了: ${YELLOW}$(basename "$target_file")${PLAIN}"
     echo -e "正在校验备份文件..."
 
+    # ─── 配置校验 ────────────────────────────
     if ! XRAY_LOCATION_ASSET="$ASSET_DIR" "$XRAY_BIN" run -test -c "$target_file" >/dev/null 2>&1; then
         echo -e "${RED}错误：该备份文件校验失败，无法还原！${PLAIN}"
         echo -e "${YELLOW}>>> 错误详情 (Debug Info):${PLAIN}"
@@ -98,6 +105,7 @@ restore_backup() {
         return
     fi
 
+    # ─── 二次确认 ────────────────────────────
     local confirm_msg="确定要覆盖当前配置吗？[y/n]: "
 
     error_msg=""
@@ -115,6 +123,7 @@ restore_backup() {
         esac
     done
 
+    # ─── 执行还原 & 重启服务 ─────────────────
     echo -e "\n${CYAN}>>> 正在还原...${PLAIN}"
     cp "$target_file" "$CONFIG_FILE"
     chmod 644 "$CONFIG_FILE"
@@ -127,9 +136,10 @@ restore_backup() {
     fi
 }
 
+# ─── 导出 / 预览配置 ─────────────────────────
 export_backup() {
     if [ ! -f "$CONFIG_FILE" ]; then echo -e "${RED}无配置可导出${PLAIN}"; return; fi
-    
+
     echo -e "${CYAN}=======================================================${PLAIN}"
     echo -e "${CYAN}           配置内容预览 (Copy & Paste)           ${PLAIN}"
     echo -e "${CYAN}=======================================================${PLAIN}"
@@ -138,6 +148,7 @@ export_backup() {
     echo -e "${YELLOW}提示：你可以复制上方内容保存到本地 config.json${PLAIN}"
 }
 
+# ─── 菜单界面 ────────────────────────────────
 show_menu() {
     tput cup 0 0
     echo -e "${CYAN}=======================================================${PLAIN}\033[K"
@@ -159,6 +170,7 @@ show_menu() {
     UI_MESSAGE=""
 }
 
+# ─── 主循环 ──────────────────────────────────
 clear
 while true; do
     show_menu

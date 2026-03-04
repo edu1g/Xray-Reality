@@ -1,14 +1,20 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Fail2ban 防火墙管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
 JAIL_FILE="/etc/fail2ban/jail.local"
 
+# ─── 环境检查 ────────────────────────────────
 clear
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 
+# ─── 配置读写 ────────────────────────────────
 get_conf() {
     local key=$1
     grep "^${key}\s*=" "$JAIL_FILE" | awk -F'=' '{print $2}' | tr -d ' '
@@ -23,11 +29,13 @@ set_conf() {
     fi
 }
 
+# ─── 服务重启 ────────────────────────────────
 restart_f2b() {
     systemctl restart fail2ban >/dev/null 2>&1
     return $?
 }
 
+# ─── 状态读取 ────────────────────────────────
 get_status() {
     if systemctl is-active fail2ban >/dev/null 2>&1; then
         local count=$(fail2ban-client status sshd 2>/dev/null | grep "Currently banned" | grep -o "[0-9]*")
@@ -37,6 +45,7 @@ get_status() {
     fi
 }
 
+# ─── 输入校验 ────────────────────────────────
 validate_time() {
     if [[ "$1" =~ ^[0-9]+[smhdw]?$ ]]; then return 0; else return 1; fi
 }
@@ -66,6 +75,7 @@ validate_ip_format() {
     return 1
 }
 
+# ─── 参数修改 ────────────────────────────────
 change_param() {
     local name=$1; local key=$2; local type=$3; local hint=$4
     local current=$(get_conf "$key")
@@ -121,6 +131,7 @@ change_param() {
     clear; printf '\033[3J'
 }
 
+# ─── 服务开关 ────────────────────────────────
 toggle_service() {
     clear
     echo -e "${CYAN}--- 服务开关 (Service Switch) ---${PLAIN}"
@@ -176,6 +187,7 @@ toggle_service() {
     done
 }
 
+# ─── IP 封禁 / 解封管理 ──────────────────────
 unban_ip() {
     local current_ip=$(echo $SSH_CLIENT | awk '{print $1}')
 
@@ -320,6 +332,7 @@ unban_ip() {
     done
 }
 
+# ─── 白名单管理 ──────────────────────────────
 add_whitelist() {
     local current_ip=$(echo $SSH_CLIENT | awk '{print $1}')
 
@@ -426,6 +439,7 @@ add_whitelist() {
     done
 }
 
+# ─── 日志查看 ────────────────────────────────
 view_logs() {
     local log_file="/var/log/fail2ban.log"
 
@@ -464,6 +478,7 @@ view_logs() {
     clear; printf '\033[3J'
 }
 
+# ─── 指数封禁子菜单 ──────────────────────────
 menu_exponential() {
     local SUB_MESSAGE=""
     while true; do
@@ -533,7 +548,8 @@ menu_exponential() {
     done
 }
 
-while true; do
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     VAL_MAX=$(get_conf "maxretry"); VAL_BAN=$(get_conf "bantime"); VAL_FIND=$(get_conf "findtime")
 
     tput cup 0 0
@@ -565,6 +581,11 @@ while true; do
     echo -e "===================================================\033[K"
 
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    show_menu
 
     error_msg=""
     while true; do

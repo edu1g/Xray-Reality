@@ -1,24 +1,29 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  系统时区与时间管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
+# ─── 时间与时区状态读取 ──────────────────────
 get_time_status() {
     local tz=$(timedatectl show -p Timezone --value)
     local ntp_active=$(timedatectl show -p NTP --value)
     local is_synced=$(timedatectl show -p NTPSynchronized --value)
-    
+
     echo -e "-------------------------------------------------\033[K"
     echo -e "  当前时间 : ${YELLOW}$(date "+%Y-%m-%d %H:%M:%S")${PLAIN}\033[K"
     echo -e "  当前时区 : ${GREEN}${tz}${PLAIN}\033[K"
-    
+
     if [ "$ntp_active" == "yes" ]; then
         echo -e "  自动同步 : ${GREEN}已开启 (Active)${PLAIN}\033[K"
     else
         echo -e "  自动同步 : ${RED}已关闭 (Inactive)${PLAIN}\033[K"
     fi
-    
+
     if [ "$is_synced" == "yes" ]; then
         echo -e "  同步状态 : ${GREEN}已校准 (Synced)${PLAIN}\033[K"
     else
@@ -27,20 +32,7 @@ get_time_status() {
     echo -e "-------------------------------------------------\033[K"
 }
 
-set_timezone() {
-    local target_tz=$1
-    local name=$2
-    
-    echo -e "\n${CYAN}>>> 正在设置时区为: $name ($target_tz)...${PLAIN}"
-    
-    if timedatectl set-timezone "$target_tz"; then
-        echo -e "${GREEN}设置成功！${PLAIN}"
-        echo -e "当前本地时间: $(date)"
-    else
-        echo -e "${RED}设置失败，请检查时区名称是否正确。${PLAIN}"
-    fi
-}
-
+# ─── 时区设置 ────────────────────────────────
 set_timezone() {
     local target_tz=$1
     local name=$2
@@ -69,6 +61,7 @@ set_custom_timezone() {
     fi
 }
 
+# ─── NTP 时间同步 ────────────────────────────
 sync_time() {
     timedatectl set-ntp true
 
@@ -105,8 +98,8 @@ sync_time() {
     UI_MESSAGE="${RED}同步响应超时，后台仍在尝试，请手动刷新。${PLAIN}"
 }
 
-clear
-while true; do
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
     echo -e "${CYAN}=================================================${PLAIN}\033[K"
     echo -e "${CYAN}         系统时区与时间管理 (Zone Manager)         ${PLAIN}\033[K"
@@ -122,7 +115,6 @@ while true; do
     echo -e "-------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)          ${YELLOW}Enter/F. 刷新 (Refresh)${PLAIN}\033[K"
     echo -e "=================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -130,8 +122,13 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "=================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+clear
+while true; do
+    show_menu
 
     error_msg=""
     while true; do
@@ -142,13 +139,8 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|3|4|0|f|F|"")
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|3|4|0|f|F|"") break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 
@@ -161,9 +153,6 @@ while true; do
             sync_time
             ;;
         0) clear; exit 0 ;;
-        f|F|"")
-            UI_MESSAGE="${YELLOW}时间已刷新。${PLAIN}"
-            continue
-            ;;
+        f|F|"") UI_MESSAGE="${YELLOW}时间已刷新。${PLAIN}"; continue ;;
     esac
 done

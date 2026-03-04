@@ -1,14 +1,19 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 更新管理器
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
-
-if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
-
 XRAY_BIN="/usr/local/bin/xray"
 
+# ─── 环境检查 ────────────────────────────────
+if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
+
+# ─── 核心升级 ────────────────────────────────
 update_core() {
     clear
     echo -e "${CYAN}>>> 正在请求官方脚本更新 Xray 核心...${PLAIN}"
@@ -17,24 +22,17 @@ update_core() {
         systemctl restart xray
         echo -e "\n${GREEN}>>> 核心更新成功！${PLAIN}"
         "$XRAY_BIN" version | head -n 1
+        UI_MESSAGE="${GREEN}核心更新成功！${PLAIN}"
     else
         echo -e "\n${RED}>>> 核心更新失败，请检查网络连接。${PLAIN}"
-    fi
-
-    if bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata; then
-        systemctl restart xray
-        echo -e "\n${GREEN}>>> 核心更新成功！${PLAIN}"
-        "$XRAY_BIN" version | head -n 1
-        UI_MESSAGE="${GREEN}核心更新成功！${PLAIN}"   # ← 新增
-    else
-        echo -e "\n${RED}>>> 核心更新失败，请检查网络连接。${PLAIN}"
-        UI_MESSAGE="${RED}核心更新失败，请检查网络连接。${PLAIN}"   # ← 新增
+        UI_MESSAGE="${RED}核心更新失败，请检查网络连接。${PLAIN}"
     fi
 
     read -n 1 -s -r -p "按任意键返回主菜单..."
     clear; printf '\033[3J'
 }
 
+# ─── GeoData 规则库更新 ──────────────────────
 update_geodata() {
     clear
     echo -e "${CYAN}>>> 正在手动更新 GeoData 路由规则库...${PLAIN}"
@@ -54,7 +52,7 @@ update_geodata() {
     while [ $attempt -le $max_retries ]; do
         echo -e "   [-] 直连拉取 GeoData (尝试 $attempt/$max_retries) ..."
 
-        curl -kL --retry 3 -o "$tmp_ip" "${urls[0]}"
+        curl -kL --retry 3 -o "$tmp_ip"   "${urls[0]}"
         curl -kL --retry 3 -o "$tmp_site" "${urls[1]}"
 
         local size_ip=$(du -k "$tmp_ip" | awk '{print $1}')
@@ -72,15 +70,15 @@ update_geodata() {
 
     if [ "$success" = true ]; then
         echo -e "校验通过，正在应用新规则..."
-        mv -f "$tmp_ip" "$share_dir/geoip.dat"
+        mv -f "$tmp_ip"   "$share_dir/geoip.dat"
         mv -f "$tmp_site" "$share_dir/geosite.dat"
         chmod 644 "$share_dir"/*.dat
         systemctl restart xray
         echo -e "\n${GREEN}>>> GeoData 更新完成！服务已重启以加载新规则。${PLAIN}"
-        UI_MESSAGE="${GREEN}GeoData 更新完成！服务已重启以加载新规则。${PLAIN}"   # ← 新增
+        UI_MESSAGE="${GREEN}GeoData 更新完成！服务已重启以加载新规则。${PLAIN}"
     else
         echo -e "${YELLOW}已自动拦截损坏的规则库，当前 Xray 服务不受影响。${PLAIN}"
-        UI_MESSAGE="${RED}更新失败：连续 ${max_retries} 次拉取均异常，当前服务不受影响。${PLAIN}"   # ← 新增
+        UI_MESSAGE="${RED}更新失败：连续 ${max_retries} 次拉取均异常，当前服务不受影响。${PLAIN}"
         rm -f "$tmp_ip" "$tmp_site"
     fi
 
@@ -88,7 +86,8 @@ update_geodata() {
     clear; printf '\033[3J'
 }
 
-while true; do
+# ─── 菜单界面 ────────────────────────────────
+show_menu() {
     tput cup 0 0
 
     if [ -x "$XRAY_BIN" ]; then
@@ -107,7 +106,6 @@ while true; do
     echo -e "---------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)\033[K"
     echo -e "===================================================\033[K"
-
     if [ -n "$UI_MESSAGE" ]; then
         echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
         UI_MESSAGE=""
@@ -115,8 +113,12 @@ while true; do
         echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
     fi
     echo -e "===================================================\033[K"
-
     tput ed
+}
+
+# ─── 主循环 ──────────────────────────────────
+while true; do
+    show_menu
 
     error_msg=""
     while true; do
@@ -127,13 +129,8 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|0)
-                break
-                ;;
-            *)
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 

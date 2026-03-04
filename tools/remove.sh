@@ -1,15 +1,21 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────
+#  Xray 一键卸载脚本
+# ─────────────────────────────────────────────
+
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
+CONFIG_FILE="/usr/local/etc/xray/config.json"
+SUMMARY=()
+
+# ─── 环境检查 ────────────────────────────────
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Error: 请使用 sudo 或 root 用户运行此脚本！${PLAIN}"
     exit 1
 fi
 
-CONFIG_FILE="/usr/local/etc/xray/config.json"
-SUMMARY=()
-
+# ─── 卸载确认 ────────────────────────────────
 clear
 echo -e "${RED}=============================================================${PLAIN}"
 echo -e "${RED}               Xray 一键卸载 (Uninstall Xray)               ${PLAIN}"
@@ -22,7 +28,6 @@ echo -e "  4. 清理 GeoData 定时更新任务与 Systemd 覆写残留"
 echo -e "${RED}=============================================================${PLAIN}"
 echo ""
 
-# --- 第一阶段交互确认 ---
 while true; do
     read -p "确认要卸载 Xray 核心及应用组件吗？[y/n]: " key
     case "$key" in
@@ -40,9 +45,7 @@ while true; do
     esac
 done
 
-# --- 1. 动态清理防火墙端口 ---
-echo -e "${GREEN}>>> 正在清理防火墙放行的端口...${PLAIN}"
-
+# ─── 防火墙端口清理工具 ──────────────────────
 _del_fw_iptables() {
     local port=$1
     iptables -D INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null
@@ -62,6 +65,9 @@ _save_iptables() {
         ip6tables-save > /etc/iptables/rules.v6 2>/dev/null
     fi
 }
+
+# ─── 防火墙端口清理 ──────────────────────────
+echo -e "${GREEN}>>> 正在清理防火墙放行的端口...${PLAIN}"
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "   [WARN] 配置文件不存在，跳过端口清理。"
@@ -91,9 +97,9 @@ else
     SUMMARY+=("端口清理：已完成（vision: ${PORT_VISION:-无}, xhttp: ${PORT_XHTTP:-无}）")
 fi
 
-# --- 2. 停止并删除应用 ---
+# ─── 停止并移除 Xray 服务 ────────────────────
 echo -e "${GREEN}>>> 正在停止并移除服务...${PLAIN}"
-systemctl stop xray >/dev/null 2>&1
+systemctl stop xray    >/dev/null 2>&1
 systemctl disable xray >/dev/null 2>&1
 
 rm -f /etc/systemd/system/xray.service
@@ -111,7 +117,7 @@ rm -rf /var/log/xray
 echo -e "   [OK] 已删除核心程序、数据与日志"
 SUMMARY+=("Xray 服务：已停止并移除")
 
-# --- 3. 删除工具脚本 ---
+# ─── 管理指令清理 ────────────────────────────
 TOOLS=("user" "backup" "sniff" "info" "zone" "net" "bbr" "bt" "f2b" "ports" "sni" "swap" "xw" "updata" "remove" "uninstall")
 echo -e "${GREEN}>>> 正在清理快捷指令...${PLAIN}"
 for tool in "${TOOLS[@]}"; do
@@ -120,7 +126,7 @@ done
 echo -e "   [OK] 已清理全部管理面板指令"
 SUMMARY+=("管理指令：已全部清理")
 
-# --- 4. 清理定时任务与残留 ---
+# ─── 定时任务清理 ────────────────────────────
 echo -e "${GREEN}>>> 正在清理定时任务...${PLAIN}"
 if command -v crontab &>/dev/null; then
     existing_cron=$(crontab -l 2>/dev/null)
@@ -137,14 +143,13 @@ fi
 rm -f /etc/needrestart/conf.d/99-xray-auto.conf 2>/dev/null
 
 systemctl daemon-reload
-# 仅在单元记录存在时执行 reset-failed，避免无关报错
 if systemctl cat xray &>/dev/null; then
     systemctl reset-failed xray 2>/dev/null
 fi
 
 rm -rf /root/xray-install 2>/dev/null
 
-# --- 第二阶段：系统环境复原 ---
+# ─── 深度复原确认 ────────────────────────────
 echo -e "\n${CYAN}=============================================================${PLAIN}"
 echo -e "${CYAN}          第二阶段：系统环境深度复原 (Optional)              ${PLAIN}"
 echo -e "${CYAN}=============================================================${PLAIN}"
@@ -164,7 +169,7 @@ while true; do
         [yY])
             echo -e "\n${GREEN}>>> 开始执行系统环境复原...${PLAIN}"
 
-            # 1. 虚拟内存
+            # ─── Swap 清理 ───────────────────
             if [ -f /swapfile ]; then
                 echo -e "   [-] 正在关闭并删除 Swap 分区..."
                 swapoff /swapfile 2>/dev/null
@@ -176,7 +181,7 @@ while true; do
             fi
             sysctl -w vm.swappiness=60 >/dev/null 2>&1
 
-            # 2. BBR
+            # ─── BBR 配置清理 ────────────────
             if [ -f /etc/sysctl.d/99-xray-bbr.conf ]; then
                 echo -e "   [-] 正在移除 BBR 优化配置..."
                 rm -f /etc/sysctl.d/99-xray-bbr.conf
@@ -186,20 +191,20 @@ while true; do
                 SUMMARY+=("BBR：未检测到配置文件，跳过")
             fi
 
-            # 3. 网络优先级 (gai.conf & IPv6)
+            # ─── 网络优先级复原 ──────────────
             echo -e "   [-] 正在恢复网络优先级与 IPv6 状态..."
             sed -i '/^precedence ::ffff:0:0\/96  100/d' /etc/gai.conf 2>/dev/null
-            sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
+            sysctl -w net.ipv6.conf.all.disable_ipv6=0     >/dev/null 2>&1
             sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
             grep -rl "net.ipv6.conf.all.disable_ipv6" /etc/sysctl.d/ 2>/dev/null | while read -r f; do
                 sed -i '/net.ipv6.conf.all.disable_ipv6/d' "$f"
                 sed -i '/net.ipv6.conf.default.disable_ipv6/d' "$f"
             done
-            sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf 2>/dev/null
+            sed -i '/net.ipv6.conf.all.disable_ipv6/d'     /etc/sysctl.conf 2>/dev/null
             sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf 2>/dev/null
             SUMMARY+=("网络优先级：已恢复 IPv6，已清理 gai.conf")
 
-            # 4. WARP 卸载（兼容脚本式与官方客户端两种安装方式）
+            # ─── WARP 卸载 ───────────────────
             warp_found=false
             if command -v warp &>/dev/null; then
                 echo -e "   [-] 检测到 warp 脚本，正在卸载..."
@@ -218,11 +223,9 @@ while true; do
                 warp_found=true
                 SUMMARY+=("WARP：已通过包管理器卸载并清理残留配置")
             fi
-            if [ "$warp_found" = false ]; then
-                SUMMARY+=("WARP：未检测到安装，跳过")
-            fi
+            [ "$warp_found" = false ] && SUMMARY+=("WARP：未检测到安装，跳过")
 
-            # 5. Fail2ban
+            # ─── Fail2ban 配置清理 ───────────
             if [ -f /etc/fail2ban/jail.local ]; then
                 echo -e "   [-] 正在移除自定义 Fail2ban 规则..."
                 rm -f /etc/fail2ban/jail.local
@@ -246,6 +249,7 @@ while true; do
     esac
 done
 
+# ─── 执行摘要 ────────────────────────────────
 echo -e "\n${CYAN}=============================================================${PLAIN}"
 echo -e "${CYAN}                     操作执行摘要                           ${PLAIN}"
 echo -e "${CYAN}=============================================================${PLAIN}"
