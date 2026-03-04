@@ -8,7 +8,6 @@ UI_MESSAGE=""
 clear
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 
-# 核心检测函数
 check_warp_socket() {
     (echo > /dev/tcp/127.0.0.1/$WARP_PORT) >/dev/null 2>&1
 }
@@ -36,12 +35,10 @@ check_rule_ui() {
     fi
 }
 
-# 静默重启服务
 apply_changes() {
     systemctl restart xray >/dev/null 2>&1
 }
 
-# Xray 配置修改
 ensure_outbound() {
     if check_xray_outbound; then return; fi
     local out_obj='{"tag": "warp_proxy", "protocol": "socks", "settings": {"servers": [{"address": "127.0.0.1", "port": '$WARP_PORT'}]}}'
@@ -56,13 +53,11 @@ remove_outbound() {
 toggle_rule() {
     local name=$1; local sites_json=$2 
     
-    # 状态前置拦截逻辑：先检测 WARP 是否存活
     if ! check_warp_socket; then
         UI_MESSAGE="${YELLOW}WARP 未运行！无法修改分流，请执行 1 安装。${PLAIN}"
         return
     fi
     
-    # 确认存活后，再向 Xray 注入接口配置
     ensure_outbound
     
     local first_site=$(echo "$sites_json" | jq -r '.[0]' 2>/dev/null)
@@ -80,7 +75,6 @@ toggle_rule() {
     apply_changes
 }
 
-# 功能模块
 install_warp() {
     clear
     echo -e "\n${BLUE}正在安装 WARP (Socks5 模式)...${PLAIN}"
@@ -108,7 +102,6 @@ uninstall_warp() {
     clear; printf '\033[3J'
 }
 
-# 主菜单逻辑
 show_menu_ui() {
 
     tput cup 0 0
@@ -144,7 +137,6 @@ show_menu_ui() {
     tput ed
 }
 
-# 主循环
 while true; do
     show_menu_ui
     
@@ -167,7 +159,6 @@ while true; do
         esac
     done
 
-    # 执行逻辑
     case "$choice" in
         1) install_warp ;;
         2) uninstall_warp ;;

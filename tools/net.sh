@@ -1,17 +1,15 @@
 #!/bin/bash
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; PLAIN="\033[0m"
 GRAY="\033[90m"
+
 UI_MESSAGE=""
 
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 GAI_CONF="/etc/gai.conf"
 SYSCTL_CONF="/etc/sysctl.conf"
 
-# 检查依赖
 if ! command -v jq &> /dev/null; then echo -e "${RED}错误: 缺少 jq 组件。${PLAIN}"; exit 1; fi
 
-# 核心辅助函数
-# 1. 连通性检测 
 check_connectivity() {
     local target_ver=$1
     local ret_code=1
@@ -36,7 +34,6 @@ check_connectivity() {
     return 1
 }
 
-# 2. SSH 连接方式检测
 check_ssh_connection() {
     local client_info="${SUDO_SSH_CLIENT:-$SSH_CLIENT}"
     
@@ -51,11 +48,9 @@ check_ssh_connection() {
     fi
 }
 
-# 3. 系统级 IPv6 开关
 toggle_system_ipv6() {
     local state=$1
     if [ "$state" == "off" ]; then
-        # 安全拦截
         if [ "$(check_ssh_connection)" == "v6" ]; then
             echo -e "${RED}[危险拦截] 检测到您当前通过 IPv6 连接 SSH！${PLAIN}"
             echo -e "${YELLOW}禁止在此状态下关闭系统 IPv6，否则您将立即失联。${PLAIN}"
@@ -65,7 +60,6 @@ toggle_system_ipv6() {
         
         sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null
         sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null
-        # 持久化
         sed -i '/net.ipv6.conf.all.disable_ipv6/d' "$SYSCTL_CONF"
         echo "net.ipv6.conf.all.disable_ipv6 = 1" >> "$SYSCTL_CONF"
     else
@@ -76,25 +70,20 @@ toggle_system_ipv6() {
     return 0
 }
 
-# 4. 设置系统优先级 (gai.conf)
 set_system_prio() {
     [ ! -f "$GAI_CONF" ] && touch "$GAI_CONF"
     sed -i '/^precedence ::ffff:0:0\/96  100/d' "$GAI_CONF"
     
-    # 如果是 v4 优先，写入规则
     if [ "$1" == "v4" ]; then 
         echo "precedence ::ffff:0:0/96  100" >> "$GAI_CONF"
     fi
-    # 注意：v6 优先是 Linux 默认行为，所以只要删掉上面的规则就是 v6 优先
 }
 
-# 5. 应用策略总控
 apply_strategy() {
     local sys_action=$1
     local xray_strategy=$2
     local desc=$3
 
-    # --- 执行系统级变更 ---
     if [ "$sys_action" == "v4_only" ]; then
         if ! toggle_system_ipv6 "off"; then return; fi
         set_system_prio "v4"
@@ -102,19 +91,16 @@ apply_strategy() {
         toggle_system_ipv6 "on"
         set_system_prio "v6"
     else
-        # 双栈模式
         toggle_system_ipv6 "on"
         if [ "$sys_action" == "v4_prio" ]; then set_system_prio "v4"; else set_system_prio "v6"; fi
     fi
 
-    # --- 连通性复查 ---
     if [ "$xray_strategy" == "UseIPv4" ] && ! check_connectivity "v4"; then
         UI_MESSAGE="${RED}错误：本机无法连接 IPv4 网络，无法执行纯 IPv4 策略！${PLAIN}"
         toggle_system_ipv6 "on"
         return
     fi
 
-    # --- 修改 Xray 配置 ---
     if [ -f "$CONFIG_FILE" ]; then
         tmp=$(mktemp)
         jq 'if .routing == null then .routing = {} else . end' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
@@ -127,26 +113,20 @@ apply_strategy() {
     fi
 }
 
-# 状态显示逻辑
 get_current_status() {
-    # 1. 获取 Xray 策略
     local xray_conf="Unknown"
     if [ -f "$CONFIG_FILE" ]; then
         xray_conf=$(jq -r '.routing.domainStrategy // "Unknown"' "$CONFIG_FILE")
     fi
     
-    # 2. 获取系统 IPv6 开关 (0=开启, 1=禁用)
     local sys_v6_val=$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)
     [ -z "$sys_v6_val" ] && sys_v6_val=0
 
-    # 3. 获取优先级
     local is_v4_prio=false
     if grep -q "^precedence ::ffff:0:0/96  100" "$GAI_CONF" 2>/dev/null; then
         is_v4_prio=true
     fi
 
-    # 4. 判定逻辑
-    
     # 情况 A: Xray 强制 IPv6
     if [ "$xray_conf" == "UseIPv6" ]; then
         STATUS_TEXT="${YELLOW}仅 IPv6 (Xray 强制)${PLAIN}"
@@ -175,7 +155,6 @@ get_current_status() {
     fi
 }
 
-# 主菜单循环
 clear
 while true; do
     get_current_status

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# 定义颜色
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -13,11 +12,8 @@ UI_MESSAGE=""
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 LOG_FILE="/var/log/xray/access.log"
 
-# 检查依赖
 if ! command -v jq &> /dev/null; then echo -e "${RED}错误: 缺少 jq 组件。${PLAIN}"; exit 1; fi
 
-# 核心函数
-# 1. 获取嗅探状态
 get_sniff_status() {
     if [ ! -f "$CONFIG_FILE" ]; then echo "Error"; return; fi
     local status=$(jq -r '.inbounds[0].sniffing.enabled // false' "$CONFIG_FILE")
@@ -28,7 +24,6 @@ get_sniff_status() {
     fi
 }
 
-# 2. 获取日志状态
 get_log_status() {
     local access_path=$(jq -r '.log.access // ""' "$CONFIG_FILE")
     if [[ "$access_path" != "" ]]; then
@@ -38,7 +33,6 @@ get_log_status() {
     fi
 }
 
-# 3. 切换嗅探开关
 toggle_sniffing() {
     local current=$(jq -r '.inbounds[0].sniffing.enabled // false' "$CONFIG_FILE")
     local target_state
@@ -92,7 +86,6 @@ toggle_sniffing() {
     fi
 }
 
-# 4. 开启/关闭 访问日志
 toggle_logging() {
     local access_path=$(jq -r '.log.access // ""' "$CONFIG_FILE")
     local action
@@ -125,7 +118,6 @@ toggle_logging() {
     fi
 }
 
-# 5. 实时监视
 trap 'trap - INT; return' INT
 watch_traffic() {
     local access_path=$(jq -r '.log.access // ""' "$CONFIG_FILE")
@@ -154,7 +146,6 @@ watch_traffic() {
 	clear
 }
 
-# 菜单
 show_menu() {
     tput cup 0 0
     echo -e "${BLUE}=================================================${PLAIN}\033[K"

@@ -1,17 +1,15 @@
 #!/bin/bash
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
+UI_MESSAGE=""
+
 JAIL_FILE="/etc/fail2ban/jail.local"
 
-# 0. 启动即清屏
 clear
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 
-# --- 核心辅助函数 ---
-
 get_conf() {
     local key=$1
-    # 提取 value
     grep "^${key}\s*=" "$JAIL_FILE" | awk -F'=' '{print $2}' | tr -d ' '
 }
 
@@ -25,14 +23,8 @@ set_conf() {
 }
 
 restart_f2b() {
-    echo -e "${INFO} 正在重载配置..."
-    systemctl restart fail2ban
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}配置已生效！${PLAIN}"
-    else
-        echo -e "${RED}Fail2ban 重启失败，请检查配置！${PLAIN}"
-    fi
-    read -n 1 -s -r -p "按任意键继续..."
+    systemctl restart fail2ban >/dev/null 2>&1
+    return $?
 }
 
 get_status() {
@@ -44,28 +36,21 @@ get_status() {
     fi
 }
 
-# --- 校验函数 ---
 validate_time() {
-    # 必须以数字开头，结尾可以是空，或者是 s,m,h,d,w 中的一个
     if [[ "$1" =~ ^[0-9]+[smhdw]?$ ]]; then return 0; else return 1; fi
 }
 
 validate_float() {
-    # 必须是纯数字或小数，不接受单位
     if [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then return 0; else return 1; fi
 }
 
 validate_int() {
-    # 仅允许纯整数
     if [[ "$1" =~ ^[0-9]+$ ]]; then return 0; else return 1; fi
 }
 
 validate_ip_format() {
     local ip=$1
-    # 1. IPv4 校验 (支持 CIDR，如 192.168.1.1/24)
-    # 正则逻辑：(0-255).(0-255).(0-255).(0-255) 可选(/0-32)
     if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$ ]]; then
-        # 进一步检查每一段是否 <= 255
         IFS='./' read -r -a octets <<< "$ip"
         for octet in "${octets[@]:0:4}"; do
             if [[ "$octet" -gt 255 ]]; then return 1; fi
@@ -73,7 +58,6 @@ validate_ip_format() {
         return 0
     fi
 
-    # 2. IPv6 校验 (简单格式检查，包含 : 和 16进制字符)
     if [[ "$ip" =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}(/[0-9]{1,3})?$ ]]; then
         if [[ "$ip" =~ :: || "$ip" =~ : ]]; then return 0; fi
     fi
@@ -81,77 +65,66 @@ validate_ip_format() {
     return 1
 }
 
-# --- 功能模块 ---
 change_param() {
     local name=$1; local key=$2; local type=$3; local hint=$4
     local current=$(get_conf "$key")
-    
-    # 初始化显示
+
     clear
     echo -e "${BLUE}正在修改: ${name}${PLAIN}"
     echo -e "当前值: ${GREEN}${current}${PLAIN}"
-    
-    if [ ! -z "$hint" ]; then
+    if [ -n "$hint" ]; then
         echo -e "${GRAY}说明: ${hint}${PLAIN}"
     fi
-    echo -e "" 
+    echo ""
 
     while true; do
-        read -p "请输入新值 (留空取消): " new_val
-        
-        if [ -z "$new_val" ]; then 
-            return 
+        echo -ne "\r\033[K请输入新值 (留空取消): "
+        read -r new_val
+
+        if [ -z "$new_val" ]; then
+            UI_MESSAGE="${GRAY}${name} 修改已取消。${PLAIN}"
+            return
         fi
-        
-        # 类型校验与错误定义
+
         local check_pass=false
-        local error_msg=""
-        
+        local err=""
+
         case "$type" in
             "time")
-                if validate_time "$new_val"; then
-                    check_pass=true
-                else
-
-                    error_msg="${RED}[错误] 格式无效 ('$new_val')。${PLAIN}\n${YELLOW}   - 必须是整数时间 (如 600)。\n   - 支持单位: s, m, h, d, w (秒,分,时,天,周)。${PLAIN}"
-                fi
+                if validate_time "$new_val"; then check_pass=true
+                else err="格式无效，必须是整数时间，支持单位 s/m/h/d/w (如 10m)。"; fi
                 ;;
             "float")
-                if validate_float "$new_val"; then
-                    check_pass=true
-                else
-                    error_msg="${RED}[错误] 格式无效 ('$new_val')。${PLAIN}\n${YELLOW}   - 必须是纯数字或小数 (如 1.5)。${PLAIN}"
-                fi
+                if validate_float "$new_val"; then check_pass=true
+                else err="格式无效，必须是纯数字或小数 (如 1.5)。"; fi
                 ;;
             "int")
-                if validate_int "$new_val"; then
-                    check_pass=true
-                else
-                    error_msg="${RED}[错误] 格式无效 ('$new_val')，仅支持纯整数。${PLAIN}"
-                fi
+                if validate_int "$new_val"; then check_pass=true
+                else err="格式无效，仅支持纯整数。"; fi
                 ;;
         esac
-        
-        # 逻辑分支
+
         if [ "$check_pass" == "true" ]; then
-            break 
+            break
         else
-            echo -ne "\033[1A\033[2K"
-            
-            echo -e "$error_msg"
-            
+            echo -ne "\033[1A\033[K${RED}[错误] ${err}${PLAIN} "
         fi
     done
-    
+
     set_conf "$key" "$new_val"
-    restart_f2b
+    if restart_f2b; then
+        UI_MESSAGE="${GREEN}${name} 已修改为 ${YELLOW}${new_val}${GREEN}，配置已生效。${PLAIN}"
+    else
+        UI_MESSAGE="${RED}${name} 写入成功，但 Fail2ban 重启失败，请检查配置！${PLAIN}"
+    fi
+    clear; printf '\033[3J'
 }
 
 toggle_service() {
     clear
-    echo -e "\n${BLUE}--- 服务开关 (Service Switch) ---${PLAIN}"
-    
-    # 1. 判断当前状态
+    echo -e "${BLUE}--- 服务开关 (Service Switch) ---${PLAIN}"
+    echo ""
+
     local is_running=false
     if systemctl is-active fail2ban >/dev/null 2>&1; then
         is_running=true
@@ -160,68 +133,58 @@ toggle_service() {
     else
         echo -e "当前状态: ${RED}已停止 (Stopped)${PLAIN}"
     fi
+    echo ""
 
-    echo -e ""
-    
-    # 2. 动态提示文本
     local prompt_msg=""
     if [ "$is_running" == "true" ]; then
-        prompt_msg="是否 **停止** 并禁用 Fail2ban? [y/n]: "
+        prompt_msg="是否 **停止** 并禁用 Fail2ban? (y/n): "
     else
-        prompt_msg="是否 **启动** 并启用 Fail2ban? [y/n]: "
+        prompt_msg="是否 **启动** 并启用 Fail2ban? (y/n): "
     fi
 
-    # 3. 读取单字符输入
-    read -r -p "$prompt_msg" input
-    
-    # 4. 逻辑判断
-    case "$input" in
-        [yY])
-            echo -e "${GREEN}YES${PLAIN}"
-            echo -e "${INFO} 正在执行操作..."
-            
-            if [ "$is_running" == "true" ]; then
-                # 执行停止
-                systemctl stop fail2ban
-                systemctl disable fail2ban
-                echo -e "${RED}>>> 服务已停止。${PLAIN}"
-            else
-                # 执行启动
-                systemctl enable fail2ban
-                systemctl start fail2ban
-                echo -e "${GREEN}>>> 服务已启动。${PLAIN}"
-            fi
-            ;;
-            
-        [nN])
-            echo -e "${YELLOW}NO${PLAIN}"
-            echo -e "${INFO} 操作已取消。"
-            ;;
-            
-        *)
-            # 捕获其他按键
-            echo -e "" 
-            echo -e "${RED}[错误] 输入无效，请输入 y 或 n。${PLAIN}"
-            ;;
-    esac
-
-    read -n 1 -s -r -p "按任意键继续..."
+    local confirm_error=""
+    while true; do
+        if [ -n "$confirm_error" ]; then
+            echo -ne "\r\033[K${RED}${confirm_error}${PLAIN} ${prompt_msg}"
+        else
+            echo -ne "\r\033[K${prompt_msg}"
+        fi
+        read -r input
+        case "$input" in
+            [yY])
+                if [ "$is_running" == "true" ]; then
+                    systemctl stop fail2ban && systemctl disable fail2ban
+                    UI_MESSAGE="${RED}Fail2ban 服务已停止并禁用。${PLAIN}"
+                else
+                    systemctl enable fail2ban && systemctl start fail2ban
+                    UI_MESSAGE="${GREEN}Fail2ban 服务已启动并启用。${PLAIN}"
+                fi
+                clear; printf '\033[3J'
+                return
+                ;;
+            [nN])
+                UI_MESSAGE="${GRAY}服务开关操作已取消。${PLAIN}"
+                clear; printf '\033[3J'
+                return
+                ;;
+            *)
+                confirm_error="错误：必须输入 y 或 n！"
+                echo -ne "\033[1A"
+                ;;
+        esac
+    done
 }
 
-# 4. IP 封禁/解封管理 (Ban/Unban Manager)
 unban_ip() {
     local current_ip=$(echo $SSH_CLIENT | awk '{print $1}')
 
-    # --- 外层循环：负责重绘界面 (Refresh Loop) ---
     while true; do
         clear
         echo -e "\n${BLUE}--- IP 封禁/解封管理 (Ban/Unban Manager) ---${PLAIN}"
-        
-        # 1. 获取列表
+
         local clean_list=$(fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | awk -F':' '{print $2}' | xargs)
         IFS=' ' read -r -a ip_array <<< "$clean_list"
-        
-        # 2. 打印表格
+
         echo -e "${GRAY}------------------------------------------${PLAIN}"
         printf "${YELLOW}%-4s %-20s${PLAIN}\n" "ID" "Banned IP Address"
         echo -e "${GRAY}------------------------------------------${PLAIN}"
@@ -235,153 +198,141 @@ unban_ip() {
             done
         fi
         echo -e "${GRAY}------------------------------------------${PLAIN}"
-        
-        # 3. 提示区
         echo -e "${YELLOW}指令说明: ${PLAIN}"
         echo -e "  - ${RED}ban${PLAIN}   -> 封禁 IP"
         echo -e "  - ${GREEN}unban${PLAIN} -> 解封 IP"
         echo -e "  - ${GRAY}0${PLAIN}     -> 返回"
         echo -e "${GRAY}------------------------------------------${PLAIN}"
-        
-        # --- 内层循环：负责交互与原地纠错 (Interaction Loop) ---
+
+        local cmd_error=""
         while true; do
-            read -p "请输入指令: " raw_input
+            if [ -n "$cmd_error" ]; then
+                echo -ne "\r\033[K${RED}${cmd_error}${PLAIN} 请输入指令: "
+            else
+                echo -ne "\r\033[K请输入指令: "
+            fi
+            read -r raw_input
             local input=$(echo "$raw_input" | tr '[:upper:]' '[:lower:]' | xargs)
 
-            # 处理空输入 (原地纠错)
             if [ -z "$input" ]; then
-                echo -ne "\033[1A\033[2K"
+                echo -ne "\033[1A"
                 continue
             fi
 
             case "$input" in
                 0) return ;;
-                
+
                 "ban")
-                    # --- 进入 BAN 子循环 ---
+                    local ban_error=""
                     while true; do
-                        echo -e ""
-                        read -p "  > 请输入封禁IP (留空取消): " ban_target
-                        
-                        # 1. 取消操作
-                        if [ -z "$ban_target" ]; then 
-                            echo -ne "\033[1A\033[2K\033[1A\033[2K" 
-                            break 
+                        echo ""
+                        if [ -n "$ban_error" ]; then
+                            echo -ne "\r\033[K${RED}${ban_error}${PLAIN} 请输入封禁IP (留空取消): "
+                        else
+                            echo -ne "\r\033[K  > 请输入封禁IP (留空取消): "
+                        fi
+                        read -r ban_target
+
+                        if [ -z "$ban_target" ]; then
+                            echo -ne "\033[1A\033[K\033[1A\033[K"
+                            break
                         fi
 
-                        # 2. 格式校验 (原地报错)
                         if ! validate_ip_format "$ban_target"; then
-                            echo -ne "\033[1A\033[2K\033[1A\033[2K"
-                            echo -e "${RED}[错误] IP 格式无效: ${ban_target}${PLAIN}"
-                            continue 
-                        fi
-                        
-                        # 3. 自杀检测 (原地报错)
-                        if [ "$ban_target" == "$current_ip" ]; then
-                            echo -ne "\033[1A\033[2K\033[1A\033[2K"
-                            echo -e "${RED}[警告] 禁止封禁本机 IP (${current_ip})！${PLAIN}"
+                            ban_error="IP 格式无效！"
+                            echo -ne "\033[1A\033[K\033[1A\033[K"
                             continue
                         fi
 
-                        # 4. 执行封禁
-                        echo -e "${INFO} 正在封禁: ${RED}${ban_target}${PLAIN} ..."
-                        local output=$(fail2ban-client set sshd banip "$ban_target")
-                        
-                        if [[ "$output" == "1" ]] || [[ "$output" == *"$ban_target"* ]]; then
-                            echo -e "${GREEN}封禁成功！正在刷新列表...${PLAIN}"
-                            sleep 0.5
-                            break 2
-                        else
-                            echo -e "${RED}失败: ${output}${PLAIN}"
-                            sleep 1
-                            break 2
+                        if [ "$ban_target" == "$current_ip" ]; then
+                            ban_error="禁止封禁本机 IP (${current_ip})！"
+                            echo -ne "\033[1A\033[K\033[1A\033[K"
+                            continue
                         fi
+
+                        local output=$(fail2ban-client set sshd banip "$ban_target")
+                        if [[ "$output" == "1" ]] || [[ "$output" == *"$ban_target"* ]]; then
+                            UI_MESSAGE="${RED}IP ${ban_target} 封禁成功。${PLAIN}"
+                        else
+                            UI_MESSAGE="${RED}封禁操作失败：${output}${PLAIN}"
+                        fi
+                        break 2
                     done
                     ;;
 
                 "unban")
-                    # --- 进入 UNBAN 子循环 ---
+                    local unban_error=""
                     while true; do
-                        echo -e ""
-                        read -p "  > 请输入解封 IP 或 ID (留空取消): " unban_target
-                        
-                        if [ -z "$unban_target" ]; then 
-                            echo -ne "\033[1A\033[2K\033[1A\033[2K"
-                            break 
+                        echo ""
+                        if [ -n "$unban_error" ]; then
+                            echo -ne "\r\033[K${RED}${unban_error}${PLAIN} 请输入解封 IP 或 ID (留空取消): "
+                        else
+                            echo -ne "\r\033[K  > 请输入解封 IP 或 ID (留空取消): "
                         fi
-                        
+                        read -r unban_target
+
+                        if [ -z "$unban_target" ]; then
+                            echo -ne "\033[1A\033[K\033[1A\033[K"
+                            break
+                        fi
+
                         local target_ip=""
                         local is_valid=true
                         local err_msg=""
 
-                        # ID/IP 识别
                         if [[ "$unban_target" =~ ^[0-9]+$ ]]; then
                             if [ "$unban_target" -ge 1 ] && [ "$unban_target" -le "${#ip_array[@]}" ]; then
                                 target_ip="${ip_array[$((unban_target-1))]}"
                             else
                                 is_valid=false
-                                err_msg="序号 ${unban_target} 不存在"
+                                err_msg="序号 ${unban_target} 不存在！"
                             fi
                         elif validate_ip_format "$unban_target"; then
                             target_ip="$unban_target"
                         else
                             is_valid=false
-                            err_msg="格式无效"
+                            err_msg="格式无效！"
                         fi
 
-                        # 错误处理 (原地报错)
                         if [ "$is_valid" == "false" ]; then
-                            echo -ne "\033[1A\033[2K\033[1A\033[2K"
-                            echo -e "${RED}[错误] ${err_msg}。${PLAIN}"
+                            unban_error="$err_msg"
+                            echo -ne "\033[1A\033[K\033[1A\033[K"
                             continue
                         fi
-                        
-                        # 执行解封
-                        echo -e "${INFO} 正在解封: ${GREEN}${target_ip}${PLAIN} ..."
+
                         local output=$(fail2ban-client set sshd unbanip "$target_ip")
-                        
-                        if [[ "$output" == *"$target_ip"* ]] || [[ "$output" == "1" ]]; then 
-                            echo -e "${GREEN}解封成功！正在刷新列表...${PLAIN}"
-                            sleep 0.5
-                            break 2
-                        else 
-                            echo -e "${RED}Fail2ban 未找到该 IP。${PLAIN}"
-                            sleep 1
-                            break 2
+                        if [[ "$output" == *"$target_ip"* ]] || [[ "$output" == "1" ]]; then
+                            UI_MESSAGE="${GREEN}IP ${target_ip} 解封成功。${PLAIN}"
+                        else
+                            UI_MESSAGE="${RED}解封失败，Fail2ban 未找到该 IP。${PLAIN}"
                         fi
+                        break 2
                     done
                     ;;
-                
+
                 *)
-                    # --- 主指令错误 (原地纠错) ---
-                    echo -ne "\033[1A\033[2K"
-                    
-                    echo -e "${RED}[错误] 无效指令: '${input}' (请输入 ban, unban 或 0)${PLAIN}"
-                    
+                    cmd_error="无效指令 '${input}'，请输入 ban、unban 或 0！"
+                    echo -ne "\033[1A"
                     ;;
             esac
         done
     done
 }
 
-# 5. 白名单管理 (Whitelist Manager)
 add_whitelist() {
     local current_ip=$(echo $SSH_CLIENT | awk '{print $1}')
 
-    # --- 外层循环：负责列表刷新 (Refresh Loop) ---
     while true; do
         clear
         echo -e "\n${BLUE}--- 白名单管理 (Whitelist Manager) ---${PLAIN}"
-        
-        # 1. 获取最新列表
+
         local raw_list=$(grep "^ignoreip" "$JAIL_FILE" | awk -F'=' '{print $2}' | sed 's/^[ \t]*//;s/[ \t]*$//')
         IFS=' ' read -r -a ip_array <<< "$raw_list"
-        
-        # 2. 打印表格
+
         echo -e "${GRAY}-------------------------------------------${PLAIN}"
         printf "${YELLOW}%-6s %-25s %s${PLAIN}\n" "ID" "IP / Network" "Type"
         echo -e "${GRAY}-------------------------------------------${PLAIN}"
-        
+
         local user_ips=()
         if [ ${#ip_array[@]} -eq 0 ]; then
             echo -e "      (当前无白名单 / None)"
@@ -398,233 +349,222 @@ add_whitelist() {
             done
         fi
         echo -e "${GRAY}-------------------------------------------${PLAIN}"
-        
-        # 3. 提示区
         echo -e "${YELLOW}本机 IP: ${GREEN}${current_ip}${PLAIN}"
         echo -e "  - ${GREEN}添加${PLAIN}: 直接输入 IP (回车默认添加本机)"
         echo -e "  - ${RED}删除${PLAIN}: 输入 'd' + 序号 (如 ${RED}d1${PLAIN})"
         echo -e "  - ${GRAY}返回${PLAIN}: 输入 0"
         echo -e "${GRAY}-------------------------------------------${PLAIN}"
-        
-        # --- 内层循环：负责交互与原地纠错 (Interaction Loop) ---
+
+        local wl_error=""
         while true; do
-            read -p "请输入指令: " input
-            
-            # A. 退出 (直接 return)
+            if [ -n "$wl_error" ]; then
+                echo -ne "\r\033[K${RED}${wl_error}${PLAIN} 请输入指令: "
+            else
+                echo -ne "\r\033[K请输入指令: "
+            fi
+            read -r input
+
             if [ "$input" == "0" ]; then return; fi
-            
-            # B. 默认添加本机 (处理空输入)
-            if [ -z "$input" ]; then 
+
+            if [ -z "$input" ]; then
                 input="$current_ip"
-                echo -ne "\033[1A\033[2K"
+                echo -ne "\033[1A\033[K"
                 echo -e "请输入指令: ${GREEN}${input} (自动填入)${PLAIN}"
             fi
-            
-            # C. 删除模式 (d + 数字)
+
             if [[ "$input" =~ ^[dD]([0-9]+)$ ]]; then
                 local del_id=${BASH_REMATCH[1]}
-                
-                # 校验 ID 有效性
                 if [ "$del_id" -lt 1 ] || [ "$del_id" -gt "${#user_ips[@]}" ]; then
-                    # --- 原地报错 ---
-                    echo -ne "\033[1A\033[2K"
-                    echo -e "${RED}[错误] 序号 $del_id 不存在！${PLAIN}"
+                    wl_error="序号 ${del_id} 不存在！"
+                    echo -ne "\033[1A\033[K"
                     continue
                 fi
-                
+
                 local target_ip="${user_ips[$((del_id-1))]}"
-                echo -e "${INFO} 正在删除白名单: ${RED}${target_ip}${PLAIN}"
-                
-                # 重建列表逻辑
                 local new_line="ignoreip ="
                 for ip in "${ip_array[@]}"; do
-                    if [ "$ip" != "$target_ip" ]; then
-                        new_line="${new_line} ${ip}"
-                    fi
+                    if [ "$ip" != "$target_ip" ]; then new_line="${new_line} ${ip}"; fi
                 done
-                
-                # 写入文件
                 sed -i "s|^ignoreip.*|${new_line}|" "$JAIL_FILE"
-                
-                restart_f2b
+
+                if restart_f2b; then
+                    UI_MESSAGE="${YELLOW}白名单 ${target_ip} 已删除，配置已生效。${PLAIN}"
+                else
+                    UI_MESSAGE="${RED}白名单已更新，但 Fail2ban 重启失败！${PLAIN}"
+                fi
                 break
             fi
 
-            # D. 添加模式 (IP 格式校验)
             if ! validate_ip_format "$input"; then
-                echo -ne "\033[1A\033[2K"
-                echo -e "${RED}[错误] IP 格式无效: '$input'${PLAIN}"
+                wl_error="IP 格式无效：'${input}'！"
+                echo -ne "\033[1A\033[K"
                 continue
             fi
 
-            # E. 查重逻辑
             local exists=false
             for ip in "${ip_array[@]}"; do
                 if [[ "$ip" == "$input" ]]; then
-                    echo -ne "\033[1A\033[2K"
-                    echo -e "${YELLOW}[提示] IP ${input} 已存在。${PLAIN}"
-                    exists=true; break
+                    wl_error="IP ${input} 已存在于白名单中！"
+                    exists=true
+                    break
                 fi
             done
-            if [ "$exists" == "true" ]; then 
+            if [ "$exists" == "true" ]; then
+                echo -ne "\033[1A\033[K"
                 continue
             fi
-            
-            # F. 执行添加
-            echo -e "${INFO} 正在添加白名单: ${GREEN}${input}${PLAIN}"
+
             sed -i "/^ignoreip/ s/$/ ${input}/" "$JAIL_FILE"
-            
-            restart_f2b
+            if restart_f2b; then
+                UI_MESSAGE="${GREEN}${input} 已加入白名单，配置已生效。${PLAIN}"
+            else
+                UI_MESSAGE="${RED}白名单已更新，但 Fail2ban 重启失败！${PLAIN}"
+            fi
             break
         done
     done
 }
 
-# 6. 查看日志
 view_logs() {
     local log_file="/var/log/fail2ban.log"
-    
+
+    clear
     if [ ! -f "$log_file" ]; then
-        clear
-        echo -e "${YELLOW}Log file not found ($log_file).${PLAIN}"
-        read -n 1 -s -r -p "Press any key to return..."
+        echo -e "${YELLOW}日志文件不存在 ($log_file)。${PLAIN}"
+        read -n 1 -s -r -p "按任意键返回..."
+        UI_MESSAGE="${YELLOW}日志文件不存在。${PLAIN}"
+        clear; printf '\033[3J'
         return
     fi
 
-    clear
     echo -e "${BLUE}=================================================================${PLAIN}"
-    echo -e "${BLUE}           Fail2ban 管理日志 (最近 33 条)                          ${PLAIN}"
+    echo -e "${BLUE}           Fail2ban 管理日志 (最近 33 条)                        ${PLAIN}"
     echo -e "${BLUE}=================================================================${PLAIN}"
-    
     printf "${GRAY}%-20s %-12s %-16s %s${PLAIN}\n" "[Date / Time]" "[Jail]" "[IP Address]" "[Action]"
     echo -e "${GRAY}-----------------------------------------------------------------${PLAIN}"
 
     grep --color=never -E "(Ban|Unban)" "$log_file" 2>/dev/null | tail -n 33 | sed -r "s/\x1b\[[0-9;]*m//g" | awk '{
-        # 提取日期时间 (前两个字段)
         dt = $1 " " substr($2, 1, 8);
-        
         jail = ""; action = ""; ip = "";
-        
-        # 循环查找关键字段，适应不同日志格式
         for(i=3; i<=NF; i++) {
-            # 找 Jail 名: [sshd]
             if ($i ~ /^\[.*\]$/) jail = $i;
-            
-            # 找动作: Ban 或 Unban
-            if ($i == "Ban" || $i == "Unban") { 
-                action = $i; ip = $(i+1); break; 
-            }
-            # 找特殊动作: Restore Ban
-            if ($i == "Restore" && $(i+1) == "Ban") { 
-                action = "ResBan"; ip = $(i+2); break; 
-            }
+            if ($i == "Ban" || $i == "Unban") { action = $i; ip = $(i+1); break; }
+            if ($i == "Restore" && $(i+1) == "Ban") { action = "ResBan"; ip = $(i+2); break; }
         }
-        
-        # 颜色渲染
         if (action == "Ban") act_str = "\033[31m" action "\033[0m";
         else if (action == "Unban") act_str = "\033[32m" action "\033[0m";
         else act_str = "\033[33m" action "\033[0m";
-
-        # 打印
-        if (jail != "" && ip != "") {
-            printf "%-20s %-12s %-16s %s\n", dt, jail, ip, act_str
-        }
+        if (jail != "" && ip != "") printf "%-20s %-12s %-16s %s\n", dt, jail, ip, act_str
     }'
-    
+
     echo -e "${GRAY}-----------------------------------------------------------------${PLAIN}"
-    
-    # 返回逻辑
     read -n 1 -s -r -p "按任意键返回主菜单..."
+    UI_MESSAGE="${GRAY}日志查看完毕。${PLAIN}"
+    clear; printf '\033[3J'
 }
 
-# 7. 指数封禁 (Exponential Backoff)
 menu_exponential() {
+    local SUB_MESSAGE=""
     while true; do
-        # 1. 刷新配置数据显示
-        clear
         local inc=$(get_conf "bantime.increment")
         local fac=$(get_conf "bantime.factor")
         local max=$(get_conf "bantime.maxtime")
-        
         local S_INC=""
         [ "$inc" == "true" ] && S_INC="${GREEN}ON${PLAIN}" || S_INC="${RED}OFF${PLAIN}"
 
-        echo -e "${BLUE}=== 指数封禁设置 (Exponential Backoff) ===${PLAIN}"
-        echo -e "  1. 递增模式开关   [${S_INC}]"
-        echo -e "  2. 修改增长系数   [${YELLOW}${fac}${PLAIN}]"
-        echo -e "  3. 修改封禁上限   [${YELLOW}${max}${PLAIN}]"
-        echo -e "---------------------------------"
-        echo -e "  0. 返回"
-        echo -e ""
-        
-        # 2. 输入循环
-    error_msg=""
-    while true; do
-        if [ -n "$error_msg" ]; then
-            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-3]: "
+        tput cup 0 0
+        echo -e "${BLUE}===================================================${PLAIN}\033[K"
+        echo -e "${BLUE}       指数封禁设置 (Exponential Backoff)         ${PLAIN}\033[K"
+        echo -e "${BLUE}===================================================${PLAIN}\033[K"
+        echo -e "  1. 递增模式开关   [${S_INC}]\033[K"
+        echo -e "  2. 修改增长系数   [${YELLOW}${fac}${PLAIN}]\033[K"
+        echo -e "  3. 修改封禁上限   [${YELLOW}${max}${PLAIN}]\033[K"
+        echo -e "---------------------------------------------------\033[K"
+        echo -e "  0. 返回\033[K"
+        echo -e "===================================================\033[K"
+
+        if [ -n "$SUB_MESSAGE" ]; then
+            echo -e "${YELLOW}当前操作${PLAIN}: ${SUB_MESSAGE}\033[K"
+            SUB_MESSAGE=""
         else
-            echo -ne "\r\033[K请输入选项 [0-3]: "
+            echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
         fi
-        read -r choice
+        echo -e "===================================================\033[K"
+
+        tput ed
+
+        local error_msg=""
+        while true; do
+            if [ -n "$error_msg" ]; then
+                echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-3]: "
+            else
+                echo -ne "\r\033[K请输入选项 [0-3]: "
+            fi
+            read -r choice
+            case "$choice" in
+                1|2|3|0) break ;;
+                *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
+            esac
+        done
+
         case "$choice" in
-            1|2|3|0) 
-                break
-                ;;
-            *) 
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
-        esac
-    done
-        
-        # 3. 执行逻辑
-        case "$choice" in
-            1) 
-                # 切换 true/false
+            1)
                 [ "$inc" == "true" ] && ns="false" || ns="true"
                 set_conf "bantime.increment" "$ns"
-                restart_f2b 
+                if restart_f2b; then
+                    SUB_MESSAGE="${GREEN}递增模式已切换为 ${ns}，配置已生效。${PLAIN}"
+                else
+                    SUB_MESSAGE="${RED}配置已写入，但 Fail2ban 重启失败！${PLAIN}"
+                fi
                 ;;
-            2) 
+            2)
                 change_param "增长系数 (Factor)" "bantime.factor" "float" \
-                "封禁时间的增长倍率。\n      - 必须是纯数字，禁止加单位。\n      - 公式: 初始时长 * 系数^封禁次数"
+                "封禁时间的增长倍率。必须是纯数字，禁止加单位。公式: 初始时长 * 系数^封禁次数"
+                SUB_MESSAGE="$UI_MESSAGE"; UI_MESSAGE=""
                 ;;
-            3) 
+            3)
                 change_param "封禁上限 (MaxTime)" "bantime.maxtime" "time" \
-                "封禁时长的最大值。\n      - 若不带单位，默认为秒 (s)。\n      - 支持单位: s, m, h, d, w。"
+                "封禁时长的最大值。支持单位 s/m/h/d/w，不带单位默认为秒。"
+                SUB_MESSAGE="$UI_MESSAGE"; UI_MESSAGE=""
                 ;;
             0) return ;;
-            *) ;;
         esac
     done
 }
 
-# --- 主循环 ---
-
 while true; do
-    # 1. 准备数据 & 绘制主菜单
     VAL_MAX=$(get_conf "maxretry"); VAL_BAN=$(get_conf "bantime"); VAL_FIND=$(get_conf "findtime")
-    
-    clear
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "${BLUE}         Fail2ban 防火墙管理 (F2B Panel)          ${PLAIN}"
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "  状态: $(get_status)"
-    echo -e "---------------------------------------------------"
-    echo -e "  1. 修改 最大重试次数 [${YELLOW}${VAL_MAX}${PLAIN}]"
-    echo -e "  2. 修改 初始封禁时长 [${YELLOW}${VAL_BAN}${PLAIN}]"
-    echo -e "  3. 修改 监测时间窗口 [${YELLOW}${VAL_FIND}${PLAIN}]"
-    echo -e "---------------------------------------------------"
-    echo -e "  4. ${GREEN}IP 封禁/解封管理${PLAIN}"
-    echo -e "  5. ${GREEN}白名单管理${PLAIN}"
-    echo -e "  6. 查看日志"
-    echo -e "  7. ${YELLOW}指数封禁设置${PLAIN}"
-    echo -e "---------------------------------------------------"
-    echo -e "  8. ${GREEN}开启${PLAIN}/${GREEN}停止${PLAIN} Fail2ban 服务"
-    echo -e "---------------------------------------------------"
-    echo -e "  0. 退出"
-    echo -e ""
-    
+
+    tput cup 0 0
+    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${BLUE}         Fail2ban 防火墙管理 (F2B Panel)          ${PLAIN}\033[K"
+    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "  状态: $(get_status)\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  1. 修改 最大重试次数 [${YELLOW}${VAL_MAX}${PLAIN}]\033[K"
+    echo -e "  2. 修改 初始封禁时长 [${YELLOW}${VAL_BAN}${PLAIN}]\033[K"
+    echo -e "  3. 修改 监测时间窗口 [${YELLOW}${VAL_FIND}${PLAIN}]\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  4. ${GREEN}IP 封禁/解封管理${PLAIN}\033[K"
+    echo -e "  5. ${GREEN}白名单管理${PLAIN}\033[K"
+    echo -e "  6. 查看日志\033[K"
+    echo -e "  7. ${YELLOW}指数封禁设置${PLAIN}\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  8. ${GREEN}开启${PLAIN}/${RED}停止${PLAIN} Fail2ban 服务\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  0. 退出\033[K"
+    echo -e "===================================================\033[K"
+
+    if [ -n "$UI_MESSAGE" ]; then
+        echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
+        UI_MESSAGE=""
+    else
+        echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
+    fi
+    echo -e "===================================================\033[K"
+
+    tput ed
+
     error_msg=""
     while true; do
         if [ -n "$error_msg" ]; then
@@ -634,29 +574,23 @@ while true; do
         fi
         read -r choice
         case "$choice" in
-            1|2|3|4|5|6|7|8|0) 
-                break
-                ;;
-            *) 
-                error_msg="输入无效！"
-                echo -ne "\033[1A"
-                ;;
+            1|2|3|4|5|6|7|8|0) break ;;
+            *) error_msg="输入无效！"; echo -ne "\033[1A" ;;
         esac
     done
 
-    # 3. 功能执行
     case "$choice" in
-        1) 
+        1)
             change_param "最大重试次数 (MaxRetry)" "maxretry" "int" \
-            "允许 IP 失败的最大次数。\n      - 超过此次数后 IP 将被封禁。\n      - 推荐值: 3 ~ 5 次。" 
+            "允许 IP 失败的最大次数。超过此次数后 IP 将被封禁。推荐值: 3~5 次。"
             ;;
-        2) 
-            change_param "初始封禁时长 (BanTime)" "bantime"  "time" \
-            "IP 被封禁的基础时长。\n      - 第一次被封禁持续的时间。\n      - 推荐: 10m (10分钟) 或 1h (1小时)。\n      - 若不带单位，默认为秒 (s)。" 
+        2)
+            change_param "初始封禁时长 (BanTime)" "bantime" "time" \
+            "IP 被封禁的基础时长。推荐: 10m 或 1h。不带单位默认为秒。"
             ;;
-        3) 
+        3)
             change_param "监测时间窗口 (FindTime)" "findtime" "time" \
-            "统计失败次数的时间范围。\n      - 在此时间内若累计失败次数达到上限，即触发封禁。\n      - 推荐: 10m (10分钟)。\n      - 若不带单位，默认为秒 (s)。" 
+            "统计失败次数的时间范围。推荐: 10m。不带单位默认为秒。"
             ;;
         4) unban_ip ;;
         5) add_whitelist ;;
@@ -664,6 +598,5 @@ while true; do
         7) menu_exponential ;;
         8) toggle_service ;;
         0) clear; exit 0 ;;
-        *) ;;
     esac
 done

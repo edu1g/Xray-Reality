@@ -7,12 +7,10 @@ XRAY_BIN="/usr/local/bin/xray"
 
 if ! command -v jq &> /dev/null; then echo -e "${RED}Error: 缺少 jq 依赖。${PLAIN}"; exit 1; fi
 
-# --- 1. 基础信息提取 ---
 SSH_PORT=$(grep "^Port" "$SSH_CONFIG" | head -n 1 | awk '{print $2}')
 [ -z "$SSH_PORT" ] && SSH_PORT=22
 HOST_NAME=$(hostname)
 
-# 提取 Config
 UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_FILE")
 PRIVATE_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey' "$CONFIG_FILE")
 SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0]' "$CONFIG_FILE")
@@ -21,19 +19,15 @@ PORT_VISION=$(jq -r '.inbounds[] | select(.tag=="vision_node") | .port' "$CONFIG
 PORT_XHTTP=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .port' "$CONFIG_FILE")
 XHTTP_PATH=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .streamSettings.xhttpSettings.path' "$CONFIG_FILE")
 
-# 计算公钥
 if [ -n "$PRIVATE_KEY" ] && [ -x "$XRAY_BIN" ]; then
     RAW_OUTPUT=$($XRAY_BIN x25519 -i "$PRIVATE_KEY")
     PUBLIC_KEY=$(echo "$RAW_OUTPUT" | grep -iE "Public|Password" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
 fi
 if [ -z "$PUBLIC_KEY" ]; then echo -e "${RED}严重错误：无法计算公钥！${PLAIN}"; exit 1; fi
 
-# --- 2. IP 检测与链接生成 ---
-
 IPV4=$(curl -s4m 1 https://api.ipify.org || echo "N/A")
 IPV6=$(curl -s6m 1 https://api64.ipify.org || echo "N/A")
 
-# IPv4 链接
 LINK_V4_VIS=""
 LINK_V4_XHT=""
 if [[ "$IPV4" != "N/A" ]]; then
@@ -41,7 +35,6 @@ if [[ "$IPV4" != "N/A" ]]; then
     LINK_V4_XHT="vless://${UUID}@${IPV4}:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv4_xhttp"
 fi
 
-# IPv6 链接
 LINK_V6_VIS=""
 LINK_V6_XHT=""
 if [[ "$IPV6" != "N/A" ]]; then
@@ -49,7 +42,6 @@ if [[ "$IPV6" != "N/A" ]]; then
     LINK_V6_XHT="vless://${UUID}@[${IPV6}]:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${HOST_NAME}_IPv6_xhttp"
 fi
 
-# --- 3. 界面展示 ---
 clear
 SEP="${BLUE}=====================================================================${PLAIN}"
 
@@ -76,7 +68,6 @@ printf " ${BLUE}%-12s${PLAIN} : ${BLUE}端口:${PLAIN} %-6s ${BLUE}协议:${PLAI
 
 echo -e "${SEP}"
 
-# 节点
 if [[ -n "$LINK_V4_VIS" ]]; then
     echo -e "\n${BLUE}IPv4 Vision:${PLAIN}"
     echo -e "${LINK_V4_VIS}"
@@ -93,7 +84,6 @@ if [[ -n "$LINK_V6_VIS" ]]; then
     echo ""
 fi
 
-# 二维码
 read -n 1 -p "是否展示二维码？[y/N] " CHOICE
 echo
 if [[ "$CHOICE" =~ ^[yY]$ ]]; then

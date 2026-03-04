@@ -1,19 +1,16 @@
 #!/bin/bash
 
-# 基础配置
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 CONFIG_FILE="/usr/local/etc/xray/config.json"
+
 UI_MESSAGE=""
 
-# 检查权限与依赖
 if [ "$EUID" -ne 0 ]; then echo -e "${RED}请使用 sudo 运行此脚本！${PLAIN}"; exit 1; fi
 if ! command -v jq &> /dev/null; then echo -e "${RED}错误: 未检测到 jq，请先安装 (apt install jq / yum install jq)。${PLAIN}"; exit 1; fi
 
 clear
 
-# 核心函数
 get_status() {
-    # 1. 检测 BT 封禁状态 (检测 block 标签且包含 bittorrent 协议)
     if jq -e '.routing.rules[] | select(.outboundTag=="block" and (.protocol | index("bittorrent")))' "$CONFIG_FILE" >/dev/null 2>&1; then
         STATUS_BT="${GREEN}已封禁 (Safe)${PLAIN}"
         IS_BT_BLOCKED=true
@@ -22,7 +19,6 @@ get_status() {
         IS_BT_BLOCKED=false
     fi
 
-    # 2. 检测私有 IP 封禁状态 (检测 block 标签且包含 geoip:private)
     if jq -e '.routing.rules[] | select(.outboundTag=="block" and (.ip | index("geoip:private")))' "$CONFIG_FILE" >/dev/null 2>&1; then
         STATUS_PRIVATE="${GREEN}已封禁 (Safe)${PLAIN}"
         IS_PRIVATE_BLOCKED=true
@@ -60,7 +56,6 @@ toggle_private() {
     apply_changes
 }
 
-# 主交互逻辑
 while true; do
     get_status
     

@@ -1,17 +1,15 @@
 #!/bin/bash
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
-# 配置文件路径
+UI_MESSAGE=""
+
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 SSH_CONFIG="/etc/ssh/sshd_config"
 
-# 检查依赖
 if ! command -v jq &> /dev/null; then
     echo -e "${RED}错误: 缺少 jq 依赖。请运行 apt-get install jq 或 yum install jq${PLAIN}"
     exit 1
 fi
-
-# --- 辅助函数 ---
 
 check_status() {
     local port=$1
@@ -45,47 +43,40 @@ get_ports() {
     fi
 }
 
-# --- 核心交互函数 ---
-# 使用全局变量 TEMP_PORT 传递结果
 input_and_validate() {
     local service_name="$1"
     local current_port="$2"
     local input_port
+    local error_msg=""
 
     while true; do
-        read -p "请输入新的 $service_name 端口 (直接回车取消) [当前: $current_port]: " input_port
+        if [ -n "$error_msg" ]; then
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入新的 $service_name 端口 (直接回车取消) [当前: $current_port]: "
+        else
+            echo -ne "\r\033[K请输入新的 $service_name 端口 (直接回车取消) [当前: $current_port]: "
+        fi
+        read -r input_port
 
-        # 1. 检查是否为空 (直接回车 -> 取消)
         if [ -z "$input_port" ]; then
-            echo -e "${YELLOW}>>> 已取消修改。${PLAIN}"
-            return 1 # 返回 1 表示取消
+            return 1
         fi
 
-        # 2. 检查是否为数字
         if [[ ! "$input_port" =~ ^[0-9]+$ ]]; then
-            echo -e "\033[1A\033[K${RED}错误：'$input_port' 不是数字，请重试。${PLAIN}"
-            sleep 1
-            echo -e "\r\033[K" 
-            echo -e "\033[1A\033[K" 
+            error_msg="错误：'$input_port' 不是数字！"
+            echo -ne "\033[1A"
             continue
         fi
 
-        # 3. 检查数值范围
         if [ "$input_port" -lt 1 ] || [ "$input_port" -gt 65535 ]; then
-            echo -e "\033[1A\033[K${RED}错误：端口 '$input_port' 超出范围 (1-65535)。${PLAIN}"
-            sleep 1
-            echo -e "\r\033[K"
-            echo -e "\033[1A\033[K"
+            error_msg="错误：端口超出范围 (1-65535)！"
+            echo -ne "\033[1A"
             continue
         fi
 
-        # 4. 输入合法，赋值给全局变量
         TEMP_PORT="$input_port"
-        return 0 # 返回 0 表示成功
+        return 0
     done
 }
-
-# --- 修改逻辑 ---
 
 change_ssh() {
     clear
@@ -96,108 +87,120 @@ change_ssh() {
     echo -e "${RED}#${PLAIN}  2. 修改后【不要关闭窗口】，新开窗口测试连接。               ${RED}#${PLAIN}"
     echo -e "${RED}################################################################${PLAIN}"
     echo ""
-    
+
+    local confirm_error=""
     while true; do
-        read -p "我已知晓风险，确认继续修改？ (y/n): " confirm
+        if [ -n "$confirm_error" ]; then
+            echo -ne "\r\033[K${RED}${confirm_error}${PLAIN} 我已知晓风险，确认继续修改？ (y/n): "
+        else
+            echo -ne "\r\033[K我已知晓风险，确认继续修改？ (y/n): "
+        fi
+        read -r confirm
         case "$confirm" in
-            [yY]) 
-                break 
+            [yY]) break ;;
+            [nN])
+                UI_MESSAGE="${YELLOW}SSH 端口修改已取消。${PLAIN}"
+                return
                 ;;
-            [nN]) 
-                echo -e "${YELLOW}>>> 操作已取消。${PLAIN}"
-                sleep 1
-                return 
-                ;;
-            *) 
-                echo -e "\033[1A\033[K${RED}错误：必须输入 y 或 n ${PLAIN}"
-                sleep 1
-                echo -ne "\033[1A\033[K"
+            *)
+                confirm_error="错误：必须输入 y 或 n！"
+                echo -ne "\033[1A"
                 ;;
         esac
     done
-	
-    # 调用输入函数，如果返回非0 (即用户回车取消)，则直接 return
+
+    echo ""
     if ! input_and_validate "SSH" "$CURRENT_SSH"; then
-        sleep 1; return
+        UI_MESSAGE="${GRAY}SSH 端口修改已取消。${PLAIN}"
+        return
     fi
-    new_port=$TEMP_PORT # 获取全局变量的值
-    
+    new_port=$TEMP_PORT
+
     echo -e "${BLUE}正在修改 SSH 端口为 $new_port ...${PLAIN}"
     sed -i "s/^Port.*/Port $new_port/" "$SSH_CONFIG"
     if ! grep -q "^Port" "$SSH_CONFIG"; then echo "Port $new_port" >> "$SSH_CONFIG"; fi
-    
+
     open_port "$new_port"
-    
+
     echo -e "${BLUE}正在重启 SSH 服务...${PLAIN}"
     systemctl restart ssh || systemctl restart sshd
     echo -e "${GREEN}修改成功！请务必新开窗口测试端口 $new_port 。${PLAIN}"
-    read -n 1 -s -r -p "按任意键继续..."
+    UI_MESSAGE="${GREEN}SSH 端口已修改为 ${YELLOW}${new_port}${GREEN}，请新开窗口验证连接。${PLAIN}"
+    read -n 1 -s -r -p "按任意键返回主菜单..."
+    clear; printf '\033[3J'
 }
 
 change_vision() {
+    clear
+    echo ""
     if ! input_and_validate "Vision" "$CURRENT_VISION"; then
-        sleep 1; return
+        UI_MESSAGE="${GRAY}Vision 端口修改已取消。${PLAIN}"
+        return
     fi
     new_port=$TEMP_PORT
 
-    echo -e "${BLUE}正在修改 Vision 端口为 $new_port ...${PLAIN}"
     jq --argjson port $new_port '(.inbounds[] | select(.tag=="vision_node").port) |= $port' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-    
     open_port "$new_port"
-    
-    echo -e "${BLUE}正在重启 Xray 服务...${PLAIN}"
     systemctl restart xray
-    echo -e "${GREEN}修改成功！${PLAIN}"
-    read -n 1 -s -r -p "按任意键继续..."
+    UI_MESSAGE="${GREEN}Vision 端口已修改为 ${YELLOW}${new_port}${GREEN}，Xray 已重启。${PLAIN}"
+    clear; printf '\033[3J'
 }
 
 change_xhttp() {
+    clear
+    echo ""
     if ! input_and_validate "XHTTP" "$CURRENT_XHTTP"; then
-        sleep 1; return
+        UI_MESSAGE="${GRAY}XHTTP 端口修改已取消。${PLAIN}"
+        return
     fi
     new_port=$TEMP_PORT
 
-    echo -e "${BLUE}正在修改 XHTTP 端口为 $new_port ...${PLAIN}"
     jq --argjson port $new_port '(.inbounds[] | select(.tag=="xhttp_node").port) |= $port' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-    
     open_port "$new_port"
-    
-    echo -e "${BLUE}正在重启 Xray 服务...${PLAIN}"
     systemctl restart xray
-    echo -e "${GREEN}修改成功！${PLAIN}"
-    read -n 1 -s -r -p "按任意键继续..."
+    UI_MESSAGE="${GREEN}XHTTP 端口已修改为 ${YELLOW}${new_port}${GREEN}，Xray 已重启。${PLAIN}"
+    clear; printf '\033[3J'
 }
-
-# --- 主循环菜单 ---
 
 while true; do
     get_ports
-    clear
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "${BLUE}          端口管理面板 (Port Manager)             ${PLAIN}"
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "  服务            端口(1-65535) 状态"
-    echo -e "---------------------------------------------------"
-    printf "  1. 修改 SSH     ${YELLOW}%-12s${PLAIN}  %s\n" "$CURRENT_SSH" "$(check_status $CURRENT_SSH)"
-    printf "  2. 修改 Vision  ${YELLOW}%-12s${PLAIN}  %s\n" "$CURRENT_VISION" "$(check_status $CURRENT_VISION)"
-    printf "  3. 修改 XHTTP   ${YELLOW}%-12s${PLAIN}  %s\n" "$CURRENT_XHTTP" "$(check_status $CURRENT_XHTTP)"
-    echo -e "---------------------------------------------------"
-    echo -e "  0. 退出 (Exit)"
-    echo -e ""
-    
+    tput cup 0 0
+
+    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${BLUE}          端口管理面板 (Port Manager)             ${PLAIN}\033[K"
+    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "  服务            端口(1-65535) 状态\033[K"
+    echo -e "---------------------------------------------------\033[K"
+    printf "  1. 修改 SSH     ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_SSH" "$(check_status $CURRENT_SSH)"
+    printf "  2. 修改 Vision  ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_VISION" "$(check_status $CURRENT_VISION)"
+    printf "  3. 修改 XHTTP   ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_XHTTP" "$(check_status $CURRENT_XHTTP)"
+    echo -e "---------------------------------------------------\033[K"
+    echo -e "  0. 退出 (Exit)\033[K"
+    echo -e "===================================================\033[K"
+
+    if [ -n "$UI_MESSAGE" ]; then
+        echo -e "${YELLOW}当前操作${PLAIN}: ${UI_MESSAGE}\033[K"
+        UI_MESSAGE=""
+    else
+        echo -e "${YELLOW}当前操作${PLAIN}: ${GRAY}等待输入...${PLAIN}\033[K"
+    fi
+    echo -e "===================================================\033[K"
+
+    tput ed
+
     error_msg=""
     while true; do
         if [ -n "$error_msg" ]; then
-            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-4]: "
+            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-3]: "
         else
-            echo -ne "\r\033[K请输入选项 [0-4]: "
+            echo -ne "\r\033[K请输入选项 [0-3]: "
         fi
         read -r choice
         case "$choice" in
-            1|2|3|4|0) 
+            1|2|3|0)
                 break
                 ;;
-            *) 
+            *)
                 error_msg="输入无效！"
                 echo -ne "\033[1A"
                 ;;
@@ -208,7 +211,6 @@ while true; do
         1) change_ssh ;;
         2) change_vision ;;
         3) change_xhttp ;;
-        0) exit 0 ;;
-        *) ;;
+        0) clear; exit 0 ;;
     esac
 done

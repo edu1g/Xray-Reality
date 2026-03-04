@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# 定义颜色
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -15,10 +14,8 @@ CONFIG_FILE="/usr/local/etc/xray/config.json"
 XRAY_BIN="/usr/local/bin/xray"
 ASSET_DIR="/usr/local/share/xray"
 
-# 确保备份目录存在
 mkdir -p "$BACKUP_DIR"
 
-# 1. 创建备份
 create_backup() {
     if [ ! -f "$CONFIG_FILE" ]; then
         UI_MESSAGE="${RED}错误：找不到配置文件，无法备份${PLAIN}"
@@ -29,12 +26,10 @@ create_backup() {
     local backup_file="$BACKUP_DIR/config_$timestamp.json"
     cp "$CONFIG_FILE" "$backup_file"
 
-    # 清理超过60天的备份，但至少保留最新1份
     local all_files=($(ls -t "$BACKUP_DIR"/config_*.json 2>/dev/null))
     local newest="${all_files[0]}"
     find "$BACKUP_DIR" -name "config_*.json" -mtime +60 ! -path "$newest" -delete 2>/dev/null
 
-    # 保留最近5份
     local count=$(ls -1 "$BACKUP_DIR"/config_*.json 2>/dev/null | wc -l)
     if [ "$count" -gt 5 ]; then
         cd "$BACKUP_DIR"
@@ -45,7 +40,6 @@ create_backup() {
     fi
 }
 
-# 2. 还原备份
 restore_backup() {
     local files=($(ls -t "$BACKUP_DIR"/config_*.json 2>/dev/null))
 
@@ -138,7 +132,6 @@ restore_backup() {
     fi
 }
 
-# 3. 导出备份
 export_backup() {
     if [ ! -f "$CONFIG_FILE" ]; then echo -e "${RED}无配置可导出${PLAIN}"; return; fi
     
@@ -150,7 +143,6 @@ export_backup() {
     echo -e "${YELLOW}提示：你可以复制上方内容保存到本地 config.json${PLAIN}"
 }
 
-# 菜单显示函数
 show_menu() {
     tput cup 0 0
     echo -e "${BLUE}=======================================================${PLAIN}\033[K"
@@ -172,7 +164,6 @@ show_menu() {
     UI_MESSAGE=""
 }
 
-# 主程序逻辑
 clear
 while true; do
     show_menu
