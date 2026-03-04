@@ -28,8 +28,14 @@ echo -e "  4. 清理 GeoData 定时更新任务与 Systemd 覆写残留"
 echo -e "${RED}=============================================================${PLAIN}"
 echo ""
 
+error_msg=""
 while true; do
-    read -p "确认要卸载 Xray 核心及应用组件吗？[y/n]: " key
+    if [ -n "$error_msg" ]; then
+        echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 确认要卸载 Xray 核心及应用组件吗？[y/n]: "
+    else
+        echo -ne "\r\033[K确认要卸载 Xray 核心及应用组件吗？[y/n]: "
+    fi
+    read -r key
     case "$key" in
         [yY])
             echo -e "\n${GREEN}>>> 操作已确认，开始应用层卸载...${PLAIN}"
@@ -40,7 +46,8 @@ while true; do
             exit 0
             ;;
         *)
-            echo -e "\033[1A\033[K${RED}错误：必须输入 y 或 n ${PLAIN}"
+            error_msg="错误：必须输入 y 或 n！"
+            echo -ne "\033[1A"
             ;;
     esac
 done
@@ -71,11 +78,11 @@ echo -e "${GREEN}>>> 正在清理防火墙放行的端口...${PLAIN}"
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "   [WARN] 配置文件不存在，跳过端口清理。"
-    SUMMARY+=("端口清理：跳过（配置文件不存在）")
+    SUMMARY+=("Port Cleanup：跳过（配置文件不存在）")
 elif ! command -v jq &>/dev/null; then
     echo -e "   [WARN] 未检测到 jq，无法解析配置文件，跳过端口清理。"
     echo -e "          如需手动清理，请执行：iptables -L INPUT --line-numbers"
-    SUMMARY+=("端口清理：跳过（jq 未安装）")
+    SUMMARY+=("Port Cleanup：跳过（jq 未安装）")
 else
     PORT_VISION=$(jq -r '.inbounds[] | select(.tag=="vision_node") | .port // empty' "$CONFIG_FILE" 2>/dev/null)
     PORT_XHTTP=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .port // empty' "$CONFIG_FILE" 2>/dev/null)
@@ -94,7 +101,7 @@ else
         [ -n "$PORT_XHTTP" ]  && _del_fw_iptables "$PORT_XHTTP"
         _save_iptables
     fi
-    SUMMARY+=("端口清理：已完成（vision: ${PORT_VISION:-无}, xhttp: ${PORT_XHTTP:-无}）")
+    SUMMARY+=("Port Cleanup：已完成（vision: ${PORT_VISION:-无}, xhttp: ${PORT_XHTTP:-无}）")
 fi
 
 # ─── 停止并移除 Xray 服务 ────────────────────
@@ -115,7 +122,7 @@ rm -f /usr/local/bin/xray
 rm -rf /usr/local/share/xray
 rm -rf /var/log/xray
 echo -e "   [OK] 已删除核心程序、数据与日志"
-SUMMARY+=("Xray 服务：已停止并移除")
+SUMMARY+=("Xray Service：已停止并移除")
 
 # ─── 管理指令清理 ────────────────────────────
 TOOLS=("user" "backup" "sniff" "info" "zone" "net" "bbr" "bt" "f2b" "ports" "sni" "swap" "xw" "updata" "remove" "uninstall")
@@ -124,7 +131,7 @@ for tool in "${TOOLS[@]}"; do
     rm -f "/usr/local/bin/$tool" 2>/dev/null
 done
 echo -e "   [OK] 已清理全部管理面板指令"
-SUMMARY+=("管理指令：已全部清理")
+SUMMARY+=("Management CLI：已全部清理")
 
 # ─── 定时任务清理 ────────────────────────────
 echo -e "${GREEN}>>> 正在清理定时任务...${PLAIN}"
@@ -133,10 +140,10 @@ if command -v crontab &>/dev/null; then
     if [ -n "$existing_cron" ]; then
         echo "$existing_cron" | grep -v "geoip.dat" | grep -v "geosite.dat" | crontab -
         echo -e "   [OK] 已清理 GeoData 定时更新任务"
-        SUMMARY+=("定时任务：已清理")
+        SUMMARY+=("Cron Jobs：已清理")
     else
         echo -e "   [INFO] 无 crontab 条目，跳过。"
-        SUMMARY+=("定时任务：无条目，跳过")
+        SUMMARY+=("Cron Jobs：无条目，跳过")
     fi
 fi
 
@@ -163,8 +170,14 @@ echo -e "  - ${GRAY}卸载 WARP 客户端${PLAIN} (若已安装)"
 echo -e "  - ${GRAY}清除 Fail2ban 配置${PLAIN} (恢复默认防爆破策略)"
 echo -e "${CYAN}-------------------------------------------------------------${PLAIN}"
 
+error_msg=""
 while true; do
-    read -p "是否执行系统环境深度复原？[y/n]: " sys_key
+    if [ -n "$error_msg" ]; then
+        echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 是否执行系统环境深度复原？[y/n]: "
+    else
+        echo -ne "\r\033[K是否执行系统环境深度复原？[y/n]: "
+    fi
+    read -r sys_key
     case "$sys_key" in
         [yY])
             echo -e "\n${GREEN}>>> 开始执行系统环境复原...${PLAIN}"
@@ -202,7 +215,7 @@ while true; do
             done
             sed -i '/net.ipv6.conf.all.disable_ipv6/d'     /etc/sysctl.conf 2>/dev/null
             sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf 2>/dev/null
-            SUMMARY+=("网络优先级：已恢复 IPv6，已清理 gai.conf")
+            SUMMARY+=("Network Priority：已恢复 IPv6，已清理 gai.conf")
 
             # ─── WARP 卸载 ───────────────────
             warp_found=false
@@ -240,11 +253,12 @@ while true; do
             ;;
         [nN])
             echo -e "\n${YELLOW}>>> 跳过深度复原，保留系统级优化。${PLAIN}"
-            SUMMARY+=("深度复原：用户选择跳过")
+            SUMMARY+=("Deep Restore：用户选择跳过")
             break
             ;;
         *)
-            echo -e "\033[1A\033[K${RED}错误：必须输入 y 或 n ${PLAIN}"
+            error_msg="错误：必须输入 y 或 n！"
+            echo -ne "\033[1A"
             ;;
     esac
 done
@@ -254,7 +268,9 @@ echo -e "\n${CYAN}=============================================================$
 echo -e "${CYAN}                     操作执行摘要                           ${PLAIN}"
 echo -e "${CYAN}=============================================================${PLAIN}"
 for item in "${SUMMARY[@]}"; do
-    echo -e "  ${GRAY}·${PLAIN} $item"
+    label="${item%%：*}"
+    val="${item#*：}"
+    printf "  ${GRAY}·${PLAIN} ${YELLOW}%-18s${PLAIN}: %s\n" "$label" "$val"
 done
 
 echo -e "\n${GREEN}=============================================================${PLAIN}"
