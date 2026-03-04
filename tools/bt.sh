@@ -100,7 +100,7 @@ while true; do
         if [ -n "$error_msg" ]; then
             echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 请输入选项 [0-2]: "
         else
-            echo -ne "\r\033[K请输入选项 [biddu0-2]: "
+            echo -ne "\r\033[K请输入选项 [0-2]: "
         fi
         read -r choice
         case "$choice" in
