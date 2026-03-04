@@ -23,7 +23,7 @@ fi
 confirm_installation
 
 # 3. 核心安装流程 (Core Modules)
-echo -e "${BLUE}>>> 正在初始化环境...${PLAIN}"
+echo -e "${CYAN}>>> 正在初始化环境...${PLAIN}"
 
 # --- 1. 环境准备 ---
 source "$BASE_DIR/core/1_env.sh"
@@ -49,7 +49,7 @@ source "$BASE_DIR/core/4_config.sh"
 core_config
 
 # 4. 部署管理工具 (Tools)
-echo -e "\n${BLUE}>>> 正在部署管理脚本...${PLAIN}"
+echo -e "\n${CYAN}>>> 正在部署管理脚本...${PLAIN}"
 
 TOOLS_DIR="$BASE_DIR/tools"
 BIN_DIR="/usr/local/bin"

@@ -1,10 +1,6 @@
 #!/bin/bash
 
-# 定义颜色
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-PLAIN='\033[0m'
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 # 定义安装目录
 INSTALL_DIR="xray-install"
