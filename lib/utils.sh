@@ -1,15 +1,10 @@
 #!/bin/bash
 # Utils: 通用工具库
 
-# 1. 颜色与 UI 定义
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-PLAIN="\033[0m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 # 2. 标准化日志前缀
-INFO="${BLUE}[INFO]${PLAIN}"
+INFO="${CYAN}[INFO]${PLAIN}"
 WARN="${YELLOW}[WARN]${PLAIN}"
 ERR="${RED}[ERR] ${PLAIN}"
 OK="${GREEN}[OK]  ${PLAIN}"
@@ -50,12 +45,12 @@ PROJECT_URL="https://github.com/uxswl/Xray-Reality"
 
 print_banner() {
     clear
-    echo -e "${BLUE}===============================================================${PLAIN}"
-    echo -e "${BLUE}          Xray-Reality Installer                               ${PLAIN}"
-    echo -e "${BLUE}===============================================================${PLAIN}"
-    echo -e "${BLUE}Author  :${PLAIN} ${AUTHOR}"
-    echo -e "${BLUE}Project :${PLAIN} ${PROJECT_URL}"
-    echo -e "${BLUE}===============================================================${PLAIN}"
+    echo -e "${CYAN}===============================================================${PLAIN}"
+    echo -e "${CYAN}          Xray-Reality Installer                               ${PLAIN}"
+    echo -e "${CYAN}===============================================================${PLAIN}"
+    echo -e "${CYAN}Author  :${PLAIN} ${AUTHOR}"
+    echo -e "${CYAN}Project :${PLAIN} ${PROJECT_URL}"
+    echo -e "${CYAN}===============================================================${PLAIN}"
     echo ""
 }
 
