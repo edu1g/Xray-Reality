@@ -1,5 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -116,13 +117,13 @@ change_ssh() {
     fi
     new_port=$TEMP_PORT
 
-    echo -e "${BLUE}正在修改 SSH 端口为 $new_port ...${PLAIN}"
+    echo -e "${CYAN}正在修改 SSH 端口为 $new_port ...${PLAIN}"
     sed -i "s/^Port.*/Port $new_port/" "$SSH_CONFIG"
     if ! grep -q "^Port" "$SSH_CONFIG"; then echo "Port $new_port" >> "$SSH_CONFIG"; fi
 
     open_port "$new_port"
 
-    echo -e "${BLUE}正在重启 SSH 服务...${PLAIN}"
+    echo -e "${CYAN}正在重启 SSH 服务...${PLAIN}"
     systemctl restart ssh || systemctl restart sshd
     echo -e "${GREEN}修改成功！请务必新开窗口测试端口 $new_port 。${PLAIN}"
     UI_MESSAGE="${GREEN}SSH 端口已修改为 ${YELLOW}${new_port}${GREEN}，请新开窗口验证连接。${PLAIN}"
@@ -166,9 +167,9 @@ while true; do
     get_ports
     tput cup 0 0
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}          端口管理面板 (Port Manager)             ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}          端口管理面板 (Port Manager)             ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  服务            端口(1-65535) 状态\033[K"
     echo -e "---------------------------------------------------\033[K"
     printf "  1. 修改 SSH     ${YELLOW}%-12s${PLAIN}  %s\033[K\n" "$CURRENT_SSH" "$(check_status $CURRENT_SSH)"

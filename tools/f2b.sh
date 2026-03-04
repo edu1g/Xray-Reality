@@ -1,5 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -70,7 +71,7 @@ change_param() {
     local current=$(get_conf "$key")
 
     clear
-    echo -e "${BLUE}正在修改: ${name}${PLAIN}"
+    echo -e "${CYAN}正在修改: ${name}${PLAIN}"
     echo -e "当前值: ${GREEN}${current}${PLAIN}"
     if [ -n "$hint" ]; then
         echo -e "${GRAY}说明: ${hint}${PLAIN}"
@@ -122,7 +123,7 @@ change_param() {
 
 toggle_service() {
     clear
-    echo -e "${BLUE}--- 服务开关 (Service Switch) ---${PLAIN}"
+    echo -e "${CYAN}--- 服务开关 (Service Switch) ---${PLAIN}"
     echo ""
 
     local is_running=false
@@ -180,7 +181,7 @@ unban_ip() {
 
     while true; do
         clear
-        echo -e "\n${BLUE}--- IP 封禁/解封管理 (Ban/Unban Manager) ---${PLAIN}"
+        echo -e "\n${CYAN}--- IP 封禁/解封管理 (Ban/Unban Manager) ---${PLAIN}"
 
         local clean_list=$(fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | awk -F':' '{print $2}' | xargs)
         IFS=' ' read -r -a ip_array <<< "$clean_list"
@@ -324,7 +325,7 @@ add_whitelist() {
 
     while true; do
         clear
-        echo -e "\n${BLUE}--- 白名单管理 (Whitelist Manager) ---${PLAIN}"
+        echo -e "\n${CYAN}--- 白名单管理 (Whitelist Manager) ---${PLAIN}"
 
         local raw_list=$(grep "^ignoreip" "$JAIL_FILE" | awk -F'=' '{print $2}' | sed 's/^[ \t]*//;s/[ \t]*$//')
         IFS=' ' read -r -a ip_array <<< "$raw_list"
@@ -342,7 +343,7 @@ add_whitelist() {
                 if [[ "$ip" =~ ^127\. ]] || [[ "$ip" == "::1" ]]; then
                     printf "${RED}%-6s${PLAIN} %-25s ${GRAY}[System]${PLAIN}\n" "#" "$ip"
                 else
-                    printf "${GREEN}%-6s${PLAIN} %-25s ${BLUE}[User]${PLAIN}\n" "$display_idx" "$ip"
+                    printf "${GREEN}%-6s${PLAIN} %-25s ${CYAN}[User]${PLAIN}\n" "$display_idx" "$ip"
                     user_ips+=("$ip")
                     ((display_idx++))
                 fi
@@ -437,9 +438,9 @@ view_logs() {
         return
     fi
 
-    echo -e "${BLUE}=================================================================${PLAIN}"
-    echo -e "${BLUE}           Fail2ban 管理日志 (最近 33 条)                        ${PLAIN}"
-    echo -e "${BLUE}=================================================================${PLAIN}"
+    echo -e "${CYAN}=================================================================${PLAIN}"
+    echo -e "${CYAN}           Fail2ban 管理日志 (最近 33 条)                        ${PLAIN}"
+    echo -e "${CYAN}=================================================================${PLAIN}"
     printf "${GRAY}%-20s %-12s %-16s %s${PLAIN}\n" "[Date / Time]" "[Jail]" "[IP Address]" "[Action]"
     echo -e "${GRAY}-----------------------------------------------------------------${PLAIN}"
 
@@ -473,9 +474,9 @@ menu_exponential() {
         [ "$inc" == "true" ] && S_INC="${GREEN}ON${PLAIN}" || S_INC="${RED}OFF${PLAIN}"
 
         tput cup 0 0
-        echo -e "${BLUE}===================================================${PLAIN}\033[K"
-        echo -e "${BLUE}       指数封禁设置 (Exponential Backoff)         ${PLAIN}\033[K"
-        echo -e "${BLUE}===================================================${PLAIN}\033[K"
+        echo -e "${CYAN}===================================================${PLAIN}\033[K"
+        echo -e "${CYAN}       指数封禁设置 (Exponential Backoff)         ${PLAIN}\033[K"
+        echo -e "${CYAN}===================================================${PLAIN}\033[K"
         echo -e "  1. 递增模式开关   [${S_INC}]\033[K"
         echo -e "  2. 修改增长系数   [${YELLOW}${fac}${PLAIN}]\033[K"
         echo -e "  3. 修改封禁上限   [${YELLOW}${max}${PLAIN}]\033[K"
@@ -536,9 +537,9 @@ while true; do
     VAL_MAX=$(get_conf "maxretry"); VAL_BAN=$(get_conf "bantime"); VAL_FIND=$(get_conf "findtime")
 
     tput cup 0 0
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}         Fail2ban 防火墙管理 (F2B Panel)          ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}         Fail2ban 防火墙管理 (F2B Panel)          ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  状态: $(get_status)\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  1. 修改 最大重试次数 [${YELLOW}${VAL_MAX}${PLAIN}]\033[K"

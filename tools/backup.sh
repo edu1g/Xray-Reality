@@ -1,11 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-PLAIN="\033[0m"
-GRAY="\033[90m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -48,7 +43,7 @@ restore_backup() {
         return
     fi
 
-    echo -e "${BLUE}>>> 请选择要还原的备份点：${PLAIN}"
+    echo -e "${CYAN}>>> 请选择要还原的备份点：${PLAIN}"
     echo -e "-------------------------------------------------------"
     local i=1
     for file in "${files[@]}"; do
@@ -120,7 +115,7 @@ restore_backup() {
         esac
     done
 
-    echo -e "\n${BLUE}>>> 正在还原...${PLAIN}"
+    echo -e "\n${CYAN}>>> 正在还原...${PLAIN}"
     cp "$target_file" "$CONFIG_FILE"
     chmod 644 "$CONFIG_FILE"
     systemctl restart xray >/dev/null 2>&1
@@ -135,19 +130,19 @@ restore_backup() {
 export_backup() {
     if [ ! -f "$CONFIG_FILE" ]; then echo -e "${RED}无配置可导出${PLAIN}"; return; fi
     
-    echo -e "${BLUE}=======================================================${PLAIN}"
-    echo -e "${BLUE}           配置内容预览 (Copy & Paste)           ${PLAIN}"
-    echo -e "${BLUE}=======================================================${PLAIN}"
+    echo -e "${CYAN}=======================================================${PLAIN}"
+    echo -e "${CYAN}           配置内容预览 (Copy & Paste)           ${PLAIN}"
+    echo -e "${CYAN}=======================================================${PLAIN}"
     cat "$CONFIG_FILE"
-    echo -e "\n${BLUE}=======================================================${PLAIN}"
+    echo -e "\n${CYAN}=======================================================${PLAIN}"
     echo -e "${YELLOW}提示：你可以复制上方内容保存到本地 config.json${PLAIN}"
 }
 
 show_menu() {
     tput cup 0 0
-    echo -e "${BLUE}=======================================================${PLAIN}\033[K"
-    echo -e "${BLUE}           Xray 配置备份与还原 (Backup)               ${PLAIN}\033[K"
-    echo -e "${BLUE}=======================================================${PLAIN}\033[K"
+    echo -e "${CYAN}=======================================================${PLAIN}\033[K"
+    echo -e "${CYAN}           Xray 配置备份与还原 (Backup)               ${PLAIN}\033[K"
+    echo -e "${CYAN}=======================================================${PLAIN}\033[K"
     echo -e "  1. ${GREEN}创建新备份 ${PLAIN}\033[K"
     echo -e "  2. ${RED}还原旧配置 ${PLAIN}\033[K"
     echo -e "  3. 查看当前配置\033[K"

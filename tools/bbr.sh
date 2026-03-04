@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -154,9 +154,9 @@ show_menu_ui() {
 
     get_status
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}          BBR 网络优化 (Network Manager)          ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}          BBR 网络优化 (Network Manager)          ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  BBR 状态 : ${STATUS_MAIN}\033[K"
     echo -e "  过载保护 : ${STATUS_DOG}\033[K"
     echo -e "---------------------------------------------------\033[K"

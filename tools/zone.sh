@@ -1,11 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-PLAIN="\033[0m"
-GRAY="\033[90m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -36,7 +31,7 @@ set_timezone() {
     local target_tz=$1
     local name=$2
     
-    echo -e "\n${BLUE}>>> 正在设置时区为: $name ($target_tz)...${PLAIN}"
+    echo -e "\n${CYAN}>>> 正在设置时区为: $name ($target_tz)...${PLAIN}"
     
     if timedatectl set-timezone "$target_tz"; then
         echo -e "${GREEN}设置成功！${PLAIN}"
@@ -113,9 +108,9 @@ sync_time() {
 clear
 while true; do
     tput cup 0 0
-    echo -e "${BLUE}=================================================${PLAIN}\033[K"
-    echo -e "${BLUE}         系统时区与时间管理 (Zone Manager)         ${PLAIN}\033[K"
-    echo -e "${BLUE}=================================================${PLAIN}\033[K"
+    echo -e "${CYAN}=================================================${PLAIN}\033[K"
+    echo -e "${CYAN}         系统时区与时间管理 (Zone Manager)         ${PLAIN}\033[K"
+    echo -e "${CYAN}=================================================${PLAIN}\033[K"
 
     get_time_status
 
@@ -123,7 +118,7 @@ while true; do
     echo -e "  2. 设置为 ${GREEN}UTC 标准时间${PLAIN} (UTC)\033[K"
     echo -e "  3. 设置为 ${YELLOW}自定义时区${PLAIN}\033[K"
     echo -e "-------------------------------------------------\033[K"
-    echo -e "  4. ${BLUE}强制同步网络时间 (Sync NTP)${PLAIN}\033[K"
+    echo -e "  4. ${CYAN}强制同步网络时间 (Sync NTP)${PLAIN}\033[K"
     echo -e "-------------------------------------------------\033[K"
     echo -e "  0. 退出 (Exit)          ${YELLOW}Enter/F. 刷新 (Refresh)${PLAIN}\033[K"
     echo -e "=================================================\033[K"

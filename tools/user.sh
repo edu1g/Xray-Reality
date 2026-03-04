@@ -1,11 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-PLAIN="\033[0m"
-GRAY="\033[90m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -16,7 +11,7 @@ if ! command -v jq &> /dev/null; then echo -e "${RED}Error: 缺少 jq 组件。$
 if ! [ -x "$XRAY_BIN" ]; then echo -e "${RED}Error: 缺少 xray 核心。${PLAIN}"; exit 1; fi
 
 _print_list() {
-    echo -e "${BLUE}>>> 当前用户列表 (User List)${PLAIN}"
+    echo -e "${CYAN}>>> 当前用户列表 (User List)${PLAIN}"
     echo -e "${GRAY}------------------------------------------------------------------${PLAIN}"
     printf "${YELLOW}%-5s %-25s %-40s${PLAIN}\n" "ID" "备注" "UUID"
     echo -e "${GRAY}------------------------------------------------------------------${PLAIN}"
@@ -35,7 +30,7 @@ _show_connection_info() {
     local target_uuid=$1
     local target_email=$2
 
-    echo -e "\n${BLUE}>>> 正在获取连接信息...${PLAIN}"
+    echo -e "\n${CYAN}>>> 正在获取连接信息...${PLAIN}"
 
     local PRIVATE_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey' "$CONFIG_FILE")
     local SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0]' "$CONFIG_FILE")
@@ -64,12 +59,12 @@ _show_connection_info() {
     if [[ "$IPV4" != "N/A" ]]; then
         if [ -n "$PORT_VISION" ]; then
             local link="vless://${target_uuid}@${IPV4}:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv4_Vision"
-            echo -e "${BLUE}IPv4 Vision:${PLAIN}"
+            echo -e "${CYAN}IPv4 Vision:${PLAIN}"
 			echo "${link}$"
         fi
         if [ -n "$PORT_XHTTP" ]; then
             local link="vless://${target_uuid}@${IPV4}:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv4_xhttp"
-            echo -e "${BLUE}IPv4 XHTTP :${PLAIN}"
+            echo -e "${CYAN}IPv4 XHTTP :${PLAIN}"
 			echo "${link}$"
         fi
         echo ""
@@ -78,12 +73,12 @@ _show_connection_info() {
     if [[ "$IPV6" != "N/A" ]]; then
         if [ -n "$PORT_VISION" ]; then
             local link="vless://${target_uuid}@[${IPV6}]:${PORT_VISION}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv6_Vision"
-            echo -e "${BLUE}IPv6 Vision:${PLAIN}"
+            echo -e "${CYAN}IPv6 Vision:${PLAIN}"
 			echo "${link}$"
         fi
         if [ -n "$PORT_XHTTP" ]; then
             local link="vless://${target_uuid}@[${IPV6}]:${PORT_XHTTP}?security=reality&encryption=none&pbk=${PUBLIC_KEY}&headerType=none&fp=chrome&type=xhttp&path=${XHTTP_PATH}&sni=${SNI_HOST}&sid=${SHORT_ID}#${target_email}_IPv6_xhttp"
-            echo -e "${BLUE}IPv6 XHTTP :${PLAIN}"
+            echo -e "${CYAN}IPv6 XHTTP :${PLAIN}"
 			echo "${link}$"
         fi
         echo ""
@@ -126,7 +121,7 @@ view_user_details() {
         local uuid=$(jq -r ".inbounds[0].settings.clients[$idx].id" "$CONFIG_FILE")
         echo ""
         _show_connection_info "$uuid" "$email"
-        echo -e "${BLUE}------------------------------------------------${PLAIN}"
+        echo -e "${CYAN}------------------------------------------------${PLAIN}"
     done
 }
 
@@ -158,7 +153,7 @@ restart_service() {
 
 add_user() {
     clear
-    echo -e "${BLUE}>>> 添加新用户${PLAIN}"
+    echo -e "${CYAN}>>> 添加新用户${PLAIN}"
     echo ""
 
     while true; do
@@ -211,7 +206,7 @@ add_user() {
         esac
 
         _show_connection_info "$new_uuid" "$email"
-        echo -e "${BLUE}------------------------------------------------${PLAIN}"
+        echo -e "${CYAN}------------------------------------------------${PLAIN}"
 
         echo -ne "\r\033[K继续添加下一个用户？[回车继续 / 0 返回]: "
         read -r cont
@@ -308,9 +303,9 @@ del_user() {
 while true; do
     tput cup 0 0
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}              多用户管理 (User Manager)           ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}              多用户管理 (User Manager)           ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  1. 查看列表 & 连接信息\033[K"
     echo -e "  2. ${GREEN}添加新用户${PLAIN}\033[K"
     echo -e "  3. ${RED}删除旧用户${PLAIN}\033[K"

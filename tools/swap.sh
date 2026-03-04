@@ -1,5 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -70,7 +71,7 @@ get_status() {
 
 add_swap() {
     clear
-    echo -e "${BLUE}正在创建 Swap 分区...${PLAIN}"
+    echo -e "${CYAN}正在创建 Swap 分区...${PLAIN}"
     echo ""
 
     local swap_size
@@ -83,7 +84,7 @@ add_swap() {
         rm -f /swapfile
     fi
 
-    echo -e "${BLUE}正在分配空间 (大小: ${swap_size}MB)...${PLAIN}"
+    echo -e "${CYAN}正在分配空间 (大小: ${swap_size}MB)...${PLAIN}"
     fallocate -l ${swap_size}M /swapfile
     chmod 600 /swapfile
     mkswap /swapfile
@@ -108,7 +109,7 @@ add_swap() {
 
 set_swappiness() {
     clear
-    echo -e "${BLUE}调整 Swappiness 亲和度${PLAIN}"
+    echo -e "${CYAN}调整 Swappiness 亲和度${PLAIN}"
     echo -e "当前值: ${YELLOW}${SWAPPINESS}${PLAIN}"
     echo -e "说明: 值越小 (0-10)，越倾向于使用物理内存；值越大 (60-100)，越倾向于使用硬盘交换。"
     echo -e "------------------------------------------------"
@@ -133,9 +134,9 @@ while true; do
     get_status
     tput cup 0 0
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}           虚拟内存管理 (Swap Manager)            ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}           虚拟内存管理 (Swap Manager)            ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  Swap 状态   : ${STATUS_SWAP}\033[K"
     echo -e "  Swappiness  : ${YELLOW}${SWAPPINESS}${PLAIN}\033[K"
     echo -e "---------------------------------------------------\033[K"

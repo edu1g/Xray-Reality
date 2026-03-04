@@ -1,5 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; PLAIN="\033[0m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 SSH_CONFIG="/etc/ssh/sshd_config"
@@ -43,43 +44,43 @@ if [[ "$IPV6" != "N/A" ]]; then
 fi
 
 clear
-SEP="${BLUE}=====================================================================${PLAIN}"
+SEP="${CYAN}=====================================================================${PLAIN}"
 
 echo -e "${SEP}"
-echo -e "${BLUE} Xray 配置信息 (Info) ${PLAIN}"
+echo -e "${CYAN} Xray 配置信息 (Info) ${PLAIN}"
 echo -e "${SEP}"
 
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "SSH"         "${SSH_PORT}"
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "IPv4"        "${IPV4}"
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "IPv6"        "${IPV6}"
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "SNI"         "${SNI_HOST}"
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "UUID"        "${UUID}"
-printf " ${BLUE}%-12s${PLAIN} : %s\n"      "Short ID"    "${SHORT_ID}"
-printf " ${BLUE}%-12s${PLAIN} : %s (客户端)\n" "Public Key"  "${PUBLIC_KEY}"
-printf " ${BLUE}%-12s${PLAIN} : %s (服务端)\n" "Private Key" "${PRIVATE_KEY}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "SSH"         "${SSH_PORT}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "IPv4"        "${IPV4}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "IPv6"        "${IPV6}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "SNI"         "${SNI_HOST}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "UUID"        "${UUID}"
+printf " ${CYAN}%-12s${PLAIN} : %s\n"      "Short ID"    "${SHORT_ID}"
+printf " ${CYAN}%-12s${PLAIN} : %s (客户端)\n" "Public Key"  "${PUBLIC_KEY}"
+printf " ${CYAN}%-12s${PLAIN} : %s (服务端)\n" "Private Key" "${PRIVATE_KEY}"
 
 echo -e "${SEP}"
 
-printf " ${BLUE}%-12s${PLAIN} : ${BLUE}端口:${PLAIN} %-6s ${BLUE}流控:${PLAIN} %s\n" \
+printf " ${CYAN}%-12s${PLAIN} : ${CYAN}端口:${PLAIN} %-6s ${CYAN}流控:${PLAIN} %s\n" \
   "Vision" "${PORT_VISION}" "xtls-rprx-vision"
 
-printf " ${BLUE}%-12s${PLAIN} : ${BLUE}端口:${PLAIN} %-6s ${BLUE}协议:${PLAIN} %-16s ${BLUE}Path:${PLAIN} %s\n" \
+printf " ${CYAN}%-12s${PLAIN} : ${CYAN}端口:${PLAIN} %-6s ${CYAN}协议:${PLAIN} %-16s ${CYAN}Path:${PLAIN} %s\n" \
   "xhttp" "${PORT_XHTTP}" "xhttp" "${XHTTP_PATH}"
 
 echo -e "${SEP}"
 
 if [[ -n "$LINK_V4_VIS" ]]; then
-    echo -e "\n${BLUE}IPv4 Vision:${PLAIN}"
+    echo -e "\n${CYAN}IPv4 Vision:${PLAIN}"
     echo -e "${LINK_V4_VIS}"
-    echo -e "\n${BLUE}IPv4 XHTTP :${PLAIN}"
+    echo -e "\n${CYAN}IPv4 XHTTP :${PLAIN}"
     echo -e "${LINK_V4_XHT}"
     echo ""
 fi
 
 if [[ -n "$LINK_V6_VIS" ]]; then
-    echo -e "${BLUE}IPv6 Vision:${PLAIN}"
+    echo -e "${CYAN}IPv6 Vision:${PLAIN}"
     echo -e "${LINK_V6_VIS}"
-    echo -e "\n${BLUE}IPv6 XHTTP :${PLAIN}"
+    echo -e "\n${CYAN}IPv6 XHTTP :${PLAIN}"
     echo -e "${LINK_V6_XHT}"
     echo ""
 fi
@@ -88,21 +89,21 @@ read -n 1 -p "是否展示二维码？[y/N] " CHOICE
 echo
 if [[ "$CHOICE" =~ ^[yY]$ ]]; then
     if [[ -n "$LINK_V4_VIS" ]]; then
-        echo -e "\n${BLUE}IPv4 Vision:${PLAIN}"
+        echo -e "\n${CYAN}IPv4 Vision:${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V4_VIS}"
-        echo -e "\n${BLUE}IPv4 XHTTP :${PLAIN}"
+        echo -e "\n${CYAN}IPv4 XHTTP :${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V4_XHT}"
     fi
     if [[ -n "$LINK_V6_VIS" ]]; then
-        echo -e "\n${BLUE}IPv6 Vision:${PLAIN}"
+        echo -e "\n${CYAN}IPv6 Vision:${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V6_VIS}"
-        echo -e "\n${BLUE}IPv6 XHTTP :${PLAIN}"
+        echo -e "\n${CYAN}IPv6 XHTTP :${PLAIN}"
         qrencode -t ANSIUTF8 "${LINK_V6_XHT}"
     fi
 fi
 
 echo -e "\n---------------------------------------------------------------------------------------------------------------------------------"
-echo -e " ${BLUE}管理命令:${PLAIN}"
+echo -e " ${CYAN}管理命令:${PLAIN}"
 echo -e " ${YELLOW}info${PLAIN} (管理员信息) | ${YELLOW}net${PLAIN} (网络) | ${YELLOW}xw${PLAIN} (WARP分流) | ${YELLOW}swap${PLAIN}  (内存) | ${YELLOW}backup${PLAIN} (备份) | ${YELLOW}f2b${PLAIN} (防火墙) | ${YELLOW}sniff${PLAIN}  (流量嗅探)"
 echo -e " ${YELLOW}user${PLAIN} (多用户管理) | ${YELLOW}sni${PLAIN} (域名) | ${YELLOW}bt${PLAIN} (BT封禁)   | ${YELLOW}ports${PLAIN} (端口) | ${YELLOW}zone${PLAIN}   (时区) | ${YELLOW}bbr${PLAIN} (内核)   | ${YELLOW}updata${PLAIN} (内核更新) | ${YELLOW}remove${PLAIN} (卸载)"
 echo -e "---------------------------------------------------------------------------------------------------------------------------------"

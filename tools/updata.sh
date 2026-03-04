@@ -1,11 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-GRAY="\033[90m"
-PLAIN="\033[0m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -16,7 +11,7 @@ XRAY_BIN="/usr/local/bin/xray"
 
 update_core() {
     clear
-    echo -e "${BLUE}>>> 正在请求官方脚本更新 Xray 核心...${PLAIN}"
+    echo -e "${CYAN}>>> 正在请求官方脚本更新 Xray 核心...${PLAIN}"
 
     if bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata; then
         systemctl restart xray
@@ -42,7 +37,7 @@ update_core() {
 
 update_geodata() {
     clear
-    echo -e "${BLUE}>>> 正在手动更新 GeoData 路由规则库...${PLAIN}"
+    echo -e "${CYAN}>>> 正在手动更新 GeoData 路由规则库...${PLAIN}"
 
     local share_dir="/usr/local/share/xray"
     local urls=(
@@ -102,9 +97,9 @@ while true; do
         LOCAL_VER="${RED}未安装${PLAIN}"
     fi
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}           Xray 更新管理 (Update Manager)         ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}           Xray 更新管理 (Update Manager)         ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  当前核心版本: ${GREEN}${LOCAL_VER}${PLAIN}\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  1. 升级 Xray 核心至最新版\033[K"

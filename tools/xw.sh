@@ -1,8 +1,9 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 WARP_PORT=40000
+
 UI_MESSAGE=""
 
 clear
@@ -77,7 +78,7 @@ toggle_rule() {
 
 install_warp() {
     clear
-    echo -e "\n${BLUE}正在安装 WARP (Socks5 模式)...${PLAIN}"
+    echo -e "\n${CYAN}正在安装 WARP (Socks5 模式)...${PLAIN}"
     (wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh && bash menu.sh c)
     
     if wait_for_port; then
@@ -112,9 +113,9 @@ show_menu_ui() {
     STATUS_NF=$(check_rule_ui "geosite:netflix")
     STATUS_AI=$(check_rule_ui "geosite:openai")
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}           WARP 分流管理面板 (Xray Warp)          ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}           WARP 分流管理面板 (Xray Warp)          ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  WARP 服务: ${STATUS_SOCK}    Xray 接口: ${STATUS_XRAY}\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  1. 安装/重装 WARP    - ${GRAY}自动配置 Socks5 端口 40000${PLAIN}\033[K"

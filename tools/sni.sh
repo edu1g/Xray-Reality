@@ -1,5 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -38,9 +39,9 @@ apply_sni() {
 
 manual_change() {
     clear
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "${BLUE}               手动修改 SNI 域名                   ${PLAIN}"
-    echo -e "${BLUE}===================================================${PLAIN}"
+    echo -e "${CYAN}===================================================${PLAIN}"
+    echo -e "${CYAN}               手动修改 SNI 域名                   ${PLAIN}"
+    echo -e "${CYAN}===================================================${PLAIN}"
     echo -e "  请输入您想要使用的SNI域名 (例: www.example.com)"
     echo -e "  输入 0 取消操作"
     echo -e "---------------------------------------------------"
@@ -69,9 +70,9 @@ manual_change() {
 
 auto_select() {
     clear
-    echo -e "${BLUE}===================================================${PLAIN}"
-    echo -e "${BLUE}          自动优选 SNI (寻找最低延迟)              ${PLAIN}"
-    echo -e "${BLUE}===================================================${PLAIN}"
+    echo -e "${CYAN}===================================================${PLAIN}"
+    echo -e "${CYAN}          自动优选 SNI (寻找最低延迟)              ${PLAIN}"
+    echo -e "${CYAN}===================================================${PLAIN}"
 
     DOMAINS=("www.icloud.com" "www.apple.com" "itunes.apple.com" "learn.microsoft.com" "www.bing.com" "www.tesla.com" "www.nvidia.com" "www.intel.com" "www.amazon.com")
 
@@ -140,9 +141,9 @@ while true; do
     get_current_sni
     tput cup 0 0
 
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
-    echo -e "${BLUE}          SNI 域名管理 (Reality Config)           ${PLAIN}\033[K"
-    echo -e "${BLUE}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
+    echo -e "${CYAN}          SNI 域名管理 (Reality Config)           ${PLAIN}\033[K"
+    echo -e "${CYAN}===================================================${PLAIN}\033[K"
     echo -e "  当前SNI域名: ${YELLOW}${CURRENT_SNI}${PLAIN}\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  1. 手动修改域名\033[K"

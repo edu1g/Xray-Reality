@@ -1,6 +1,7 @@
 #!/bin/bash
 
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
+
 CONFIG_FILE="/usr/local/etc/xray/config.json"
 
 UI_MESSAGE=""
@@ -60,9 +61,9 @@ while true; do
     get_status
     
 tput cup 0 0
-echo -e "${BLUE}===================================================${PLAIN}\033[K"
-echo -e "${BLUE}          流量拦截管理 (Traffic Blocker)          ${PLAIN}\033[K"
-echo -e "${BLUE}===================================================${PLAIN}\033[K"
+echo -e "${CYAN}===================================================${PLAIN}\033[K"
+echo -e "${CYAN}          流量拦截管理 (Traffic Blocker)          ${PLAIN}\033[K"
+echo -e "${CYAN}===================================================${PLAIN}\033[K"
 echo -e "  BT / P2P 下载   : ${STATUS_BT}\033[K"
 echo -e "  私有 IP (局域网): ${STATUS_PRIVATE}\033[K"
 echo -e "---------------------------------------------------\033[K"

@@ -1,11 +1,6 @@
 #!/bin/bash
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[36m"
-PLAIN="\033[0m"
-GRAY="\033[90m"
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -148,9 +143,9 @@ watch_traffic() {
 
 show_menu() {
     tput cup 0 0
-    echo -e "${BLUE}=================================================${PLAIN}\033[K"
-    echo -e "${BLUE}          Xray 流量嗅探 (Sniffing)                    ${PLAIN}\033[K"
-    echo -e "${BLUE}=================================================${PLAIN}\033[K"
+    echo -e "${CYAN}=================================================${PLAIN}\033[K"
+    echo -e "${CYAN}          Xray 流量嗅探 (Sniffing)                    ${PLAIN}\033[K"
+    echo -e "${CYAN}=================================================${PLAIN}\033[K"
     echo -e " 流量嗅探: $(get_sniff_status)\033[K"
     echo -e " 日志记录: $(get_log_status)\033[K"
     echo -e "-------------------------------------------------\033[K"

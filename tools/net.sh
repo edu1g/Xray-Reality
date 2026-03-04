@@ -1,6 +1,6 @@
 #!/bin/bash
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; BLUE="\033[36m"; PLAIN="\033[0m"
-GRAY="\033[90m"
+
+RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 
 UI_MESSAGE=""
 
@@ -161,9 +161,9 @@ while true; do
     
     tput cup 0 0
     
-    echo -e "${BLUE}================================================${PLAIN}\033[K"
-    echo -e "${BLUE}           网络优先级切换 (Network Priority)    ${PLAIN}\033[K"
-    echo -e "${BLUE}================================================${PLAIN}\033[K"
+    echo -e "${CYAN}================================================${PLAIN}\033[K"
+    echo -e "${CYAN}           网络优先级切换 (Network Priority)    ${PLAIN}\033[K"
+    echo -e "${CYAN}================================================${PLAIN}\033[K"
     echo -e " 当前状态: ${STATUS_TEXT}\033[K"
     echo -e "------------------------------------------------\033[K"
     echo -e " [双栈模式]\033[K"
