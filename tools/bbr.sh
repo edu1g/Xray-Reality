@@ -255,6 +255,7 @@ uninstall_watchdog() {
 }
 
 # ─── 菜单界面 ────────────────────────────────
+clear
 show_menu_ui() {
     tput cup 0 0
     get_status

@@ -114,6 +114,7 @@ uninstall_warp() {
 }
 
 # ─── 菜单界面 ────────────────────────────────
+clear
 show_menu() {
     tput cup 0 0
 

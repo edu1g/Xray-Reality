@@ -549,6 +549,7 @@ menu_exponential() {
 }
 
 # ─── 菜单界面 ────────────────────────────────
+clear
 show_menu() {
     VAL_MAX=$(get_conf "maxretry"); VAL_BAN=$(get_conf "bantime"); VAL_FIND=$(get_conf "findtime")
 
