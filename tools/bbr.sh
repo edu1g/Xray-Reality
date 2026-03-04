@@ -117,7 +117,7 @@ do_rollback() {
 verify_bbr() {
     local active_cc
     active_cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
-    if [[ "$active_cc" == "BBR" ]]; then
+    if [[ "$active_cc" == "bbr" ]]; then
         echo "${GREEN} 验证通过${PLAIN} (当前: ${active_cc})"
     else
         echo "${RED} 验证失败${PLAIN} — BBR 未实际生效 (当前: ${active_cc})"
