@@ -1,8 +1,7 @@
 #!/bin/bash
-# --- 4. 生成配置 (Config Generation) ---
 
 core_config() {
-    echo -e "\n${BLUE}--- 5. 生成 Xray 配置文件 (Config) ---${PLAIN}"
+    echo -e "\n${CYAN}--- 5. 生成 Xray 配置文件 (Config) ---${PLAIN}"
 
     # 1. 检查必要变量
     if [ -z "$PORT_VISION" ] || [ -z "$PORT_XHTTP" ]; then

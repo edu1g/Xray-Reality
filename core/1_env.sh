@@ -82,7 +82,7 @@ pre_flight_check() {
             
             # 简单的转圈动画
             local frame=${UI_SPINNER_FRAMES[$((ticks % 4))]}
-            printf "\r ${BLUE}[ %s ]${PLAIN} System busy... (${ticks}s)" "$frame"
+            printf "\r ${CYAN}[ %s ]${PLAIN} System busy... (${ticks}s)" "$frame"
             
             sleep 0.5
             ((ticks++))
@@ -140,7 +140,7 @@ check_net_stack() {
 }
 
 setup_timezone() {
-    echo -e "\n${BLUE}--- 1. 基础环境配置 (Basic Env) ---${PLAIN}"
+    echo -e "\n${CYAN}--- 1. 基础环境配置 (Basic Env) ---${PLAIN}"
     
     # 1. 系统检查
     check_sys_arch

@@ -28,7 +28,7 @@ _add_fw_rule() {
 }
 
 setup_firewall_and_security() {
-    echo -e "\n${BLUE}--- 3. 端口与安全 (Security) ---${PLAIN}"
+    echo -e "\n${CYAN}--- 3. 端口与安全 (Security) ---${PLAIN}"
     
     # 1. 自动获取 SSH 端口
     local current_ssh_port=$(grep "^Port" /etc/ssh/sshd_config | head -n 1 | awk '{print $2}' | tr -d '\r')

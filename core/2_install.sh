@@ -132,7 +132,7 @@ install_geodata_robust() {
 
 # 主入口函数 (Main Function)
 core_install() {
-    echo -e "\n${BLUE}--- 2. 核心组件 (Core) ---${PLAIN}"
+    echo -e "\n${CYAN}--- 2. 核心组件 (Core) ---${PLAIN}"
 
     # 1. 抑制交互与系统清理 (合并显示)
     export DEBIAN_FRONTEND=noninteractive
