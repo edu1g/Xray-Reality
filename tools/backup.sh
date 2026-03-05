@@ -192,7 +192,7 @@ while true; do
 
     case "$choice" in
         1) create_backup ;;
-        2) restore_backup ;;
+        2) clear; restore_backup ;;
         3) export_backup; read -n 1 -s -r -p "按任意键返回菜单..."; clear ;;
         0) clear; exit 0 ;;
     esac

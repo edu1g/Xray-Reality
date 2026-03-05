@@ -42,8 +42,6 @@ XHTTP_PATH=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .streamSettings.x
 
 # ─── 公钥计算 ────────────────────────────────
 RAW_OUTPUT=$("$XRAY_BIN" x25519 -i "$PRIVATE_KEY")
-
-# 还原原版写法：先 grep 过滤行，再 awk 提取值，两步分离避免 tolower 与字段分割的兼容性问题
 PUBLIC_KEY=$(echo "$RAW_OUTPUT" | grep -iE "Public|Password" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
 
 if [ -z "$PUBLIC_KEY" ]; then
@@ -51,11 +49,11 @@ if [ -z "$PUBLIC_KEY" ]; then
     exit 1
 fi
 
-# ─── 公网 IP 获取 ────────────────────────────
+# ─── IP 获取 ────────────────────────────
 IPV4=$(curl -s4 -m 3 https://api.ipify.org 2>/dev/null || echo "N/A")
 IPV6=$(curl -s6 -m 3 https://api64.ipify.org 2>/dev/null || echo "N/A")
 
-# ─── 分享链接生成 ────────────────────────────
+# ─── 链接生成 ────────────────────────────
 LINK_V4_VIS=""
 LINK_V4_XHT=""
 if [[ "$IPV4" != "N/A" ]]; then
@@ -97,7 +95,7 @@ printf " ${CYAN}%-12s${PLAIN} : ${CYAN}端口:${PLAIN} %-6s ${CYAN}协议:${PLAI
 
 echo -e "${SEP}"
 
-# ─── 分享链接输出 ────────────────────────────
+# ─── vless 链接 ───
 if [[ -n "$LINK_V4_VIS" ]]; then
     echo -e "\n${CYAN}IPv4 Vision:${PLAIN}"
     echo -e "${LINK_V4_VIS}"
@@ -114,25 +112,125 @@ if [[ -n "$LINK_V6_VIS" ]]; then
     echo ""
 fi
 
-# ─── 二维码展示 ──────────────────────────────
-read -rn 1 -p "是否展示二维码？[y/N] " CHOICE
-echo
-if [[ "$CHOICE" =~ ^[yY]$ ]]; then
-    if ! command -v qrencode &>/dev/null; then
-        echo -e "${RED}Error: 缺少 qrencode 依赖，无法生成二维码。${PLAIN}"
+# ─── 订阅二维码 ──────────────────────────
+if ! command -v qrencode &>/dev/null; then
+    echo -e "${RED}Error: 缺少 qrencode 依赖，无法生成二维码。${PLAIN}"
+elif ! command -v python3 &>/dev/null; then
+    echo -e "${RED}Error: 缺少 python3，无法启动临时订阅服务。${PLAIN}"
+else
+    # ─── 收集所有可用链接 ────────────────────
+    ALL_LINKS=""
+    [[ -n "$LINK_V4_VIS" ]] && ALL_LINKS+="${LINK_V4_VIS}\n"
+    [[ -n "$LINK_V4_XHT" ]] && ALL_LINKS+="${LINK_V4_XHT}\n"
+    [[ -n "$LINK_V6_VIS" ]] && ALL_LINKS+="${LINK_V6_VIS}\n"
+    [[ -n "$LINK_V6_XHT" ]] && ALL_LINKS+="${LINK_V6_XHT}\n"
+
+    if [ -z "$ALL_LINKS" ]; then
+        echo -e "${RED}Error: 未检测到任何可用链接，请确认网络状态。${PLAIN}"
     else
-        if [[ -n "$LINK_V4_VIS" ]]; then
-            echo -e "\n${CYAN}IPv4 Vision:${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V4_VIS}"
-            echo -e "\n${CYAN}IPv4 XHTTP :${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V4_XHT}"
+        # ─── 随机选取 10000 以上的空闲端口 ──────
+        _pick_sub_port() {
+            local port attempt=0
+            while [ $attempt -lt 100 ]; do
+                port=$(shuf -i 10000-65535 -n 1)
+                if ! lsof -i:"$port" -P -n >/dev/null 2>&1 \
+                    && [ "$port" != "$PORT_VISION" ] \
+                    && [ "$port" != "$PORT_XHTTP" ] \
+                    && [ "$port" != "$SSH_PORT" ]; then
+                    echo "$port"
+                    return 0
+                fi
+                ((attempt++))
+            done
+            echo -e "${RED}Error: 无法找到可用端口，请检查系统端口占用情况。${PLAIN}" >&2
+            return 1
+        }
+
+        SUB_PORT=$(_pick_sub_port) || exit 1
+
+        # ─── 临时开放防火墙入站规则 ──
+        _fw_open_sub_port() {
+            iptables  -A INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
+            if [ -f /proc/net/if_inet6 ]; then
+                ip6tables -A INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
+            fi
+        }
+
+        # ─── 服务结束后撤销防火墙规则 ────────────
+        _fw_close_sub_port() {
+            iptables  -D INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
+            if [ -f /proc/net/if_inet6 ]; then
+                ip6tables -D INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
+            fi
+        }
+
+        # ─── 注册信号捕获，确保异常退出时规则同样被清理 ──
+        trap '_fw_close_sub_port; rm -rf "$SUB_DIR"; exit' INT TERM EXIT
+
+        # ─── 生成 base64 订阅内容并写入临时目录 ──
+        SUB_CONTENT=$(printf "%b" "$ALL_LINKS" | base64 -w 0)
+        SUB_DIR=$(mktemp -d)
+        printf "%s" "$SUB_CONTENT" > "$SUB_DIR/sub"
+
+        _fw_open_sub_port
+
+        # ─── 启动临时 HTTP 服务（60 秒）──
+        python3 -c "
+import http.server, os, threading
+os.chdir('$SUB_DIR')
+class H(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        if self.path != '/sub':
+            self.send_error(404)
+            return
+        with open('sub', 'rb') as f:
+            content = f.read()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
+        self.send_header('Content-Length', str(len(content)))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(content)
+srv = http.server.HTTPServer(('0.0.0.0', $SUB_PORT), H)
+threading.Timer(60, srv.shutdown).start()
+srv.serve_forever()
+" &
+        HTTP_PID=$!
+
+        # ─── 生成订阅 URL ─────────────────
+        if [[ "$IPV4" != "N/A" ]]; then
+            SUB_HOST="$IPV4"
+        else
+            SUB_HOST="[$IPV6]"
         fi
-        if [[ -n "$LINK_V6_VIS" ]]; then
-            echo -e "\n${CYAN}IPv6 Vision:${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V6_VIS}"
-            echo -e "\n${CYAN}IPv6 XHTTP :${PLAIN}"
-            qrencode -t ANSIUTF8 "${LINK_V6_XHT}"
-        fi
+        SUB_URL="http://${SUB_HOST}:${SUB_PORT}/sub"
+
+        NODE_COUNT=$(printf "%b" "$ALL_LINKS" | grep -c 'vless://')
+        echo -e "\n${CYAN}订阅地址（含 ${NODE_COUNT} 个节点）:${PLAIN}"
+        echo -e "${YELLOW}${SUB_URL}${PLAIN}\n"
+        echo -e "${CYAN}订阅二维码（60s 内有效）:${PLAIN}\n"
+        qrencode -t ANSIUTF8 "${SUB_URL}"
+		echo -e ""
+
+        # ─── 倒计时提示 ──────────────────────────
+        tput civis
+        for ((i=60; i>=0; i--)); do
+            if [ $i -gt 0 ]; then
+                printf "\r\033[90m已开放临时端口 ${SUB_PORT}，\033[31m%2d\033[90m 秒后自动关闭并撤销防火墙规则。\033[0m" "$i"
+            else
+                printf "\r\033[32m已撤销临时端口 ${SUB_PORT}，并清理临时防火墙规则。                    \033[0m"
+            fi
+            sleep 1
+        done
+        tput cnorm
+        echo
+
+        # ─── 等待服务退出并清理 ──────────────────
+        wait "$HTTP_PID" 2>/dev/null
+        rm -rf "$SUB_DIR"
+        _fw_close_sub_port
+        trap - INT TERM EXIT
     fi
 fi
 

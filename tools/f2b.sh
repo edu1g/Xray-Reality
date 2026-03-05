@@ -490,7 +490,7 @@ menu_exponential() {
 
         tput cup 0 0
         echo -e "${CYAN}===================================================${PLAIN}\033[K"
-        echo -e "${CYAN}       指数封禁设置 (Exponential Backoff)         ${PLAIN}\033[K"
+        echo -e "${CYAN}       递增封禁设置 (Exponential Backoff)         ${PLAIN}\033[K"
         echo -e "${CYAN}===================================================${PLAIN}\033[K"
         echo -e "  1. 递增模式开关   [${S_INC}]\033[K"
         echo -e "  2. 修改增长系数   [${YELLOW}${fac}${PLAIN}]\033[K"
@@ -564,9 +564,9 @@ show_menu() {
     echo -e "  3. 修改 监测时间窗口 [${YELLOW}${VAL_FIND}${PLAIN}]\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  4. ${GREEN}IP 封禁/解封管理${PLAIN}\033[K"
-    echo -e "  5. ${GREEN}白名单管理${PLAIN}\033[K"
+    echo -e "  5. ${GREEN}IP 白名单管理${PLAIN}\033[K"
     echo -e "  6. 查看日志\033[K"
-    echo -e "  7. ${YELLOW}指数封禁设置${PLAIN}\033[K"
+    echo -e "  7. ${YELLOW}递增封禁设置${PLAIN}\033[K"
     echo -e "---------------------------------------------------\033[K"
     echo -e "  8. ${GREEN}开启${PLAIN}/${RED}停止${PLAIN} Fail2ban 服务\033[K"
     echo -e "---------------------------------------------------\033[K"
@@ -605,15 +605,15 @@ while true; do
     case "$choice" in
         1)
             change_param "最大重试次数 (MaxRetry)" "maxretry" "int" \
-            "允许 IP 失败的最大次数。超过此次数后 IP 将被封禁。推荐值: 3~5 次。"
+            "允许 IP 失败的最大次数。必须是纯数字，禁止加单位。超过此次数后 IP 将被封禁。推荐值: 3~5 次。"
             ;;
         2)
             change_param "初始封禁时长 (BanTime)" "bantime" "time" \
-            "IP 被封禁的基础时长。推荐: 10m 或 1h。不带单位默认为秒。"
+            "IP 被封禁的基础时长。支持单位 s/m/h/d/w，不带单位默认为秒。推荐: 1h 或 1d。"
             ;;
         3)
             change_param "监测时间窗口 (FindTime)" "findtime" "time" \
-            "统计失败次数的时间范围。推荐: 10m。不带单位默认为秒。"
+            "统计失败次数的时间范围。支持单位 s/m/h/d/w，不带单位默认为秒。推荐: 1d。"
             ;;
         4) unban_ip ;;
         5) add_whitelist ;;
