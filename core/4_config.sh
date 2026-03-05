@@ -1,47 +1,51 @@
 #!/bin/bash
 
-core_config() {
-    echo -e "\n${CYAN}--- 5. 生成 Xray 配置文件 (Config) ---${PLAIN}"
+# ─────────────────────────────────────────────
+#  4_config.sh — 生成 Xray 配置文件
+# ─────────────────────────────────────────────
 
-    # 1. 检查必要变量
+# ─── Xray 配置生成入口 ───────────────────────
+core_config() {
+    echo -e "\n${CYAN}--- 4. 生成 Xray 配置文件 (Config) ---${PLAIN}"
+
+    # ─── 参数与环境校验 ──────────────────────
     if [ -z "$PORT_VISION" ] || [ -z "$PORT_XHTTP" ]; then
-        echo -e "${RED}[FATAL] 端口参数丢失！请检查系统配置步骤。${PLAIN}"
+        echo -e "${RED}[FATAL] 端口参数丢失，请检查系统配置步骤。${PLAIN}"
         exit 1
     fi
 
-    # 2. 默认伪装域名 (SNI)
     SNI_HOST="www.icloud.com"
-    echo -e "${OK} 使用SNI域名: ${GREEN}${SNI_HOST}${PLAIN}"
+    echo -e "${OK} 使用 SNI 域名: ${GREEN}${SNI_HOST}${PLAIN}"
 
-    # 3. 准备目录与核心
     mkdir -p /usr/local/etc/xray
     XRAY_BIN="/usr/local/bin/xray"
 
-    if [ ! -f "$XRAY_BIN" ]; then
-        echo -e "${RED}[FATAL] 找不到 Xray 核心文件，请检查安装步骤！${PLAIN}"
+    if [ ! -x "$XRAY_BIN" ]; then
+        echo -e "${RED}[FATAL] 找不到 Xray 核心文件或不可执行，请检查安装步骤。${PLAIN}"
         exit 1
     fi
 
-    # 4. 生成身份认证信息
+    # ─── 密钥对与 UUID 生成 ──────────────────
     echo -e "${INFO} 正在生成密钥对与 UUID..."
-    
-    UUID=$($XRAY_BIN uuid)
-    KEYS=$($XRAY_BIN x25519)
-    # 提取密钥
-    PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk -F': ' '{print $2}' | xargs)
-    PUBLIC_KEY=$(echo "$KEYS" | grep -E "Public|Password" | awk -F': ' '{print $2}' | xargs)
-    
-    # ShortId: Reality 的短 ID，推荐 8 位 16 进制 (4字节)
+
+    UUID=$("$XRAY_BIN" uuid)
+    local keys_output
+    keys_output=$("$XRAY_BIN" x25519)
+
+    # 先 grep 过滤行，再 awk 提取值，两步分离避免 tolower 与字段分割的兼容性问题
+    PRIVATE_KEY=$(echo "$keys_output" | grep -iE "^PrivateKey:"          | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
+    PUBLIC_KEY=$(echo  "$keys_output" | grep -iE "^(PublicKey|Password):" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
+
     SHORT_ID=$(openssl rand -hex 4)
-    # XHTTP Path: 随机路径
     XHTTP_PATH="/$(openssl rand -hex 4)"
 
-    if [ -z "$UUID" ] || [ -z "$PRIVATE_KEY" ]; then
-        echo -e "${ERR} 密钥生成失败，无法继续！"
+    # 非空校验，不对密钥格式做假设，对 Xray 版本变化具备更强的容错性
+    if [ -z "$UUID" ] || [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
+        echo -e "${ERR} 密钥生成失败或解析异常（UUID=${UUID:-空}, PrivKey=${PRIVATE_KEY:-空}, PubKey=${PUBLIC_KEY:-空}），无法继续。"
         exit 1
     fi
 
-    # 5. 写入 config.json
+    # ─── config.json 写入 ────────────────────
     cat > /usr/local/etc/xray/config.json <<EOF
 {
   "log": { "loglevel": "warning" },
@@ -94,45 +98,39 @@ core_config() {
     }
   ],
   "outbounds": [
-    { "protocol": "freedom", "tag": "direct" },
-    { "protocol": "blackhole", "tag": "block" }
+    { "protocol": "freedom",   "tag": "direct" },
+    { "protocol": "blackhole", "tag": "block"  }
   ],
   "routing": {
     "domainStrategy": "${DOMAIN_STRATEGY:-IPIfNonMatch}",
     "rules": [
-      { "type": "field", "ip": [ "geoip:private" ], "outboundTag": "block" },
-      { "type": "field", "protocol": [ "bittorrent" ], "outboundTag": "block" }
+      { "type": "field", "ip":       [ "geoip:private" ], "outboundTag": "block" },
+      { "type": "field", "protocol": [ "bittorrent" ],     "outboundTag": "block" }
     ]
   }
 }
 EOF
 
-    # 6. Systemd 资源限制与路径优化 (Systemd Override)
-    
+    # ─── Systemd 服务覆写配置 ────────────────
     mkdir -p /etc/systemd/system/xray.service.d
-    
-    # 注意：Environment 必须指定到 /usr/local/share/xray/ 目录
     cat > /etc/systemd/system/xray.service.d/override.conf <<EOF
 [Service]
 LimitNOFILE=infinity
-LimitNPROC=infinity
+LimitNPROC=65535
 TasksMax=infinity
 Environment="XRAY_LOCATION_ASSET=/usr/local/share/xray/"
 EOF
 
-# 7. 最终配置有效性验证 (Config Validation)
-echo -e "${INFO} 正在验证配置文件有效性..."
-if "$XRAY_BIN" run -test -confdir /usr/local/etc/xray >/dev/null 2>&1; then
-    echo -e "${OK} Xray 配置验证通过 (Syntax OK)"
-else
-    echo -e "${RED}[FATAL] 生成的配置文件无效！可能是 Xray 版本过低或配置语法错误。${PLAIN}"
-    # 尝试输出详细错误信息供调试
-    "$XRAY_BIN" run -test -confdir /usr/local/etc/xray
-    exit 1
-fi
+    # ─── 配置文件有效性验证 ──────────────────
+    echo -e "${INFO} 正在验证配置文件有效性..."
+    if "$XRAY_BIN" run -test -confdir /usr/local/etc/xray >/dev/null 2>&1; then
+        echo -e "${OK} Xray 配置验证通过 (Syntax OK)"
+    else
+        echo -e "${RED}[FATAL] 生成的配置文件无效，请检查 Xray 版本或配置语法。${PLAIN}"
+        "$XRAY_BIN" run -test -confdir /usr/local/etc/xray
+        exit 1
+    fi
 
-    # 重载 systemd 配置
     systemctl daemon-reload >/dev/null 2>&1
-
     echo -e "${OK} Xray 配置文件生成完毕。"
 }
