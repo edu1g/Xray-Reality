@@ -1,8 +1,20 @@
 #!/bin/bash
 
-# 1. 基础准备
+# ─────────────────────────────────────────────
+#  install.sh — 主安装入口
+#
+#  模块加载顺序与变量流转：
+#    utils.sh      →  定义 _LOCK_FILE, execute_task, 颜色变量等基础工具
+#    1_env.sh      →  输出 ARCH, HAS_V4, HAS_V6, CURL_OPT, DOMAIN_STRATEGY
+#    2_install.sh  →  消费无显式变量，结果体现于文件系统
+#    3_system.sh   →  消费 HAS_V4, HAS_V6；输出 SSH_PORT, PORT_VISION, PORT_XHTTP
+#    4_config.sh   →  消费 PORT_VISION, PORT_XHTTP, DOMAIN_STRATEGY
+#                     输出 UUID, PUBLIC_KEY, PRIVATE_KEY, SHORT_ID, SNI_HOST, XHTTP_PATH
+# ─────────────────────────────────────────────
+
 BASE_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# ─── 基础工具加载 ────────────────────────────
 if [ -f "$BASE_DIR/lib/utils.sh" ]; then
     source "$BASE_DIR/lib/utils.sh"
 else
@@ -10,63 +22,54 @@ else
     exit 1
 fi
 
-# 2. 预检与交互
+# ─── 预检与交互 ──────────────────────────────
 print_banner
-if [ "$EUID" -ne 0 ]; then echo -e "${RED}Error: 请使用 root 运行！${PLAIN}"; exit 1; fi
 
-# 锁机制检查
-if command -v lock_acquire &> /dev/null; then
-    if ! lock_acquire; then echo -e "${RED}脚本已在运行！${PLAIN}"; exit 1; fi
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Error: 请使用 root 运行！${PLAIN}"
+    exit 1
 fi
 
-# 确认安装
+if ! lock_acquire; then
+    echo -e "${RED}脚本已在运行！${PLAIN}"
+    exit 1
+fi
+
 confirm_installation
 
-# 3. 核心安装流程 (Core Modules)
-echo -e "${CYAN}>>> 正在初始化环境...${PLAIN}"
-
-# --- 1. 环境准备 ---
+# ─── 1. 环境准备 ─────────────────────────────
 source "$BASE_DIR/core/1_env.sh"
 pre_flight_check
 check_net_stack
-setup_timezone
+setup_base_env
 
-# --- 2. 安装核心 ---
+# ─── 2. 核心安装 ─────────────────────────────
 source "$BASE_DIR/core/2_install.sh"
-# 兼容处理：如果 2_install.sh 封装了函数则调用，否则假设它source时已自动执行
-if command -v core_install &>/dev/null; then
-    core_install
-fi
+core_install
 
-# --- 3. 系统配置 ---
+# ─── 3. 系统配置 ─────────────────────────────
 source "$BASE_DIR/core/3_system.sh"
-# 自动设置防火墙、端口
 setup_firewall_and_security
 
-# --- 4. 生成配置 ---
+# ─── 4. 生成配置 ─────────────────────────────
 source "$BASE_DIR/core/4_config.sh"
-# 自动生成 UUID、密钥，使用步骤3确定的端口写入 config.json
 core_config
 
-# 4. 部署管理工具 (Tools)
-echo -e "\n${CYAN}>>> 正在部署管理脚本...${PLAIN}"
+# ─── 5. 部署管理工具 ─────────────────────────
+echo -e "\n${CYAN}>>> 5. 正在部署管理脚本...${PLAIN}"
 
 TOOLS_DIR="$BASE_DIR/tools"
 BIN_DIR="/usr/local/bin"
 
 if [ -d "$TOOLS_DIR" ]; then
-    count=$(ls "$TOOLS_DIR"/*.sh 2>/dev/null | wc -l)
-    
-    if [ "$count" != "0" ]; then
+    count=$(find "$TOOLS_DIR" -maxdepth 1 -name "*.sh" | wc -l)
+    if [ "$count" -gt 0 ]; then
         for script in "$TOOLS_DIR"/*.sh; do
-            if [ -f "$script" ]; then
-                filename=$(basename "$script" .sh)
-                target="$BIN_DIR/$filename"
-                
-                cp "$script" "$target"
-                chmod +x "$target"
-                echo -e "${OK} 部署命令: ${GREEN}${filename}${PLAIN}"
-            fi
+            [ -f "$script" ] || continue
+            filename=$(basename "$script" .sh)
+            cp "$script" "$BIN_DIR/$filename"
+            chmod +x "$BIN_DIR/$filename"
+            echo -e "${OK} 部署命令: ${GREEN}${filename}${PLAIN}"
         done
     else
         echo -e "${WARN} tools 目录为空，跳过部署。"
@@ -75,20 +78,23 @@ else
     echo -e "${ERR} tools 目录缺失，请检查项目完整性。"
 fi
 
-# 5. 启动服务与收尾
-echo -e "\n${GREEN}>>> 正在启动服务...${PLAIN}"
+# ─── 6. 启动服务 ─────────────────────────────
+echo -e "\n${CYAN}>>> 6. 正在启动服务...${PLAIN}"
 
 systemctl daemon-reload
 systemctl enable xray
-systemctl restart xray
 
-if [ $? -eq 0 ]; then
-    # 自动显示 info
-    if [ -f "/usr/local/bin/info" ]; then
-        bash /usr/local/bin/info
-    fi
-else
+if ! systemctl restart xray; then
     echo -e "\n${RED}Error: Xray 服务启动失败！${PLAIN}"
     echo -e "请检查日志: journalctl -u xray -n 20 --no-pager"
     exit 1
+fi
+
+# ─── 7. 安装完成 ─────────────────────────
+echo -e "\n${GREEN}=====================================================================${PLAIN}"
+echo -e "${GREEN} 安装完成！${PLAIN}"
+echo -e "${GREEN}=====================================================================${PLAIN}"
+
+if [ -f "$BIN_DIR/info" ]; then
+    bash "$BIN_DIR/info"
 fi
