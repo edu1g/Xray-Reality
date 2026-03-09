@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  install.sh — 主安装入口
+#  install.sh — 主安装入口 (已集成 status=23 启动修复)
 #
 #  模块加载顺序与变量流转：
 #    utils.sh      →  定义 _LOCK_FILE, execute_task, 颜色变量等基础工具
@@ -81,12 +81,31 @@ fi
 # ─── 6. 启动服务 ─────────────────────────────
 echo -e "\n${CYAN}>>> 6. 正在启动服务...${PLAIN}"
 
+# 解决 status=23 的关键点：启动前确保环境彻底重载
 systemctl daemon-reload
 systemctl enable xray
 
+# 尝试启动并增加自动纠错逻辑
 if ! systemctl restart xray; then
+    echo -e "${WARN} 首次启动失败，正在尝试权限修复与二次重载..."
+    # 强制初始化日志目录权限 (防止 status=23)
+    mkdir -p /var/log/xray/
+    if getent group nogroup > /dev/null; then
+        chown -R nobody:nogroup /var/log/xray/
+    else
+        chown -R nobody:nobody /var/log/xray/
+    fi
+    chmod -R 755 /var/log/xray/
+    
+    # 二次尝试
+    systemctl daemon-reload
+    systemctl restart xray
+fi
+
+# 最终状态校验
+if ! systemctl is-active --quiet xray; then
     echo -e "\n${RED}Error: Xray 服务启动失败！${PLAIN}"
-    echo -e "请检查日志: journalctl -u xray -n 20 --no-pager"
+    echo -e "请执行 'journalctl -u xray -n 20 --no-pager' 查看具体错误原因。"
     exit 1
 fi
 
