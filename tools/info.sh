@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Xray 配置信息查看器
+#  Xray 配置信息查看器 (已优化：直接显示订阅与二维码，无倒计时)
 # ─────────────────────────────────────────────────────────────────────────────
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
@@ -125,117 +125,62 @@ else
     [[ -n "$LINK_V6_VIS" ]] && ALL_LINKS+="${LINK_V6_VIS}\n"
     [[ -n "$LINK_V6_XHT" ]] && ALL_LINKS+="${LINK_V6_XHT}\n"
 
-    if [ -z "$ALL_LINKS" ]; then
-        echo -e "${RED}Error: 未检测到任何可用链接，请确认网络状态。${PLAIN}"
-    else
-        # ─── 随机选取 10000 以上的空闲端口 ──────
+    if [ -n "$ALL_LINKS" ]; then
+        # ─── 选取空闲端口 ──────
         _pick_sub_port() {
-            local port attempt=0
-            while [ $attempt -lt 100 ]; do
+            local port
+            for i in {1..100}; do
                 port=$(shuf -i 10000-65535 -n 1)
-                if ! lsof -i:"$port" -P -n >/dev/null 2>&1 \
-                    && [ "$port" != "$PORT_VISION" ] \
-                    && [ "$port" != "$PORT_XHTTP" ] \
-                    && [ "$port" != "$SSH_PORT" ]; then
-                    echo "$port"
-                    return 0
+                if ! lsof -i:"$port" -P -n >/dev/null 2>&1; then
+                    echo "$port"; return 0
                 fi
-                ((attempt++))
             done
-            echo -e "${RED}Error: 无法找到可用端口，请检查系统端口占用情况。${PLAIN}" >&2
             return 1
         }
 
-        SUB_PORT=$(_pick_sub_port) || exit 1
+        SUB_PORT=$(_pick_sub_port)
+        if [ -n "$SUB_PORT" ]; then
+            # 开启防火墙端口
+            iptables -I INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
+            [ -f /proc/net/if_inet6 ] && ip6tables -I INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
 
-        # ─── 临时开放防火墙入站规则 ──
-        _fw_open_sub_port() {
-            iptables  -A INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-            if [ -f /proc/net/if_inet6 ]; then
-                ip6tables -A INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-            fi
-        }
+            # 生成订阅文件
+            SUB_DIR=$(mktemp -d)
+            printf "%b" "$ALL_LINKS" | base64 -w 0 > "$SUB_DIR/sub"
 
-        # ─── 服务结束后撤销防火墙规则 ────────────
-        _fw_close_sub_port() {
-            iptables  -D INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-            if [ -f /proc/net/if_inet6 ]; then
-                ip6tables -D INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-            fi
-        }
-
-        # ─── 注册信号捕获，确保异常退出时规则同样被清理 ──
-        trap '_fw_close_sub_port; rm -rf "$SUB_DIR"; exit' INT TERM EXIT
-
-        # ─── 生成 base64 订阅内容并写入临时目录 ──
-        SUB_CONTENT=$(printf "%b" "$ALL_LINKS" | base64 -w 0)
-        SUB_DIR=$(mktemp -d)
-        printf "%s" "$SUB_CONTENT" > "$SUB_DIR/sub"
-
-        _fw_open_sub_port
-
-        # ─── 启动临时 HTTP 服务（60 秒）──
-        python3 -c "
-import http.server, os, threading
+            # 启动后台静默 HTTP 服务
+            nohup python3 -c "
+import http.server, os
 os.chdir('$SUB_DIR')
 class H(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_GET(self):
-        if self.path != '/sub':
-            self.send_error(404)
-            return
-        with open('sub', 'rb') as f:
-            content = f.read()
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/plain; charset=utf-8')
-        self.send_header('Content-Length', str(len(content)))
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        self.wfile.write(content)
-srv = http.server.HTTPServer(('0.0.0.0', $SUB_PORT), H)
-threading.Timer(60, srv.shutdown).start()
-srv.serve_forever()
-" &
-        HTTP_PID=$!
+        if self.path == '/sub':
+            with open('sub', 'rb') as f: content = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(content)
+http.server.HTTPServer(('0.0.0.0', $SUB_PORT), H).serve_forever()
+" >/dev/null 2>&1 &
 
-        # ─── 生成订阅 URL ─────────────────
-        if [[ "$IPV4" != "N/A" ]]; then
-            SUB_HOST="$IPV4"
-        else
-            SUB_HOST="[$IPV6]"
+            # 显示结果
+            SUB_HOST="${IPV4:-[$IPV6]}"
+            [[ "$SUB_HOST" == "N/A" ]] && SUB_HOST="[$IPV6]"
+            SUB_URL="http://${SUB_HOST}:${SUB_PORT}/sub"
+
+            NODE_COUNT=$(printf "%b" "$ALL_LINKS" | grep -c 'vless://')
+            echo -e "\n${CYAN}订阅地址（含 ${NODE_COUNT} 个节点）:${PLAIN}"
+            echo -e "${YELLOW}${SUB_URL}${PLAIN}\n"
+            echo -e "${CYAN}订阅二维码:${PLAIN}\n"
+            qrencode -t ANSIUTF8 "${SUB_URL}"
+            echo -e ""
         fi
-        SUB_URL="http://${SUB_HOST}:${SUB_PORT}/sub"
-
-        NODE_COUNT=$(printf "%b" "$ALL_LINKS" | grep -c 'vless://')
-        echo -e "\n${CYAN}订阅地址（含 ${NODE_COUNT} 个节点）:${PLAIN}"
-        echo -e "${YELLOW}${SUB_URL}${PLAIN}\n"
-        echo -e "${CYAN}订阅二维码（60s 内有效）:${PLAIN}\n"
-        qrencode -t ANSIUTF8 "${SUB_URL}"
-		echo -e ""
-
-        # ─── 倒计时提示 ──────────────────────────
-        tput civis
-        for ((i=60; i>=0; i--)); do
-            if [ $i -gt 0 ]; then
-                printf "\r\033[90m已开放临时端口 ${SUB_PORT}，\033[31m%2d\033[90m 秒后自动关闭并撤销防火墙规则。\033[0m" "$i"
-            else
-                printf "\r\033[32m已撤销临时端口 ${SUB_PORT}，并清理临时防火墙规则。                    \033[0m"
-            fi
-            sleep 1
-        done
-        tput cnorm
-        echo
-
-        # ─── 等待服务退出并清理 ──────────────────
-        wait "$HTTP_PID" 2>/dev/null
-        rm -rf "$SUB_DIR"
-        _fw_close_sub_port
-        trap - INT TERM EXIT
     fi
 fi
 
 # ─── 管理命令速查 ────────────────────────────
-echo -e "\n---------------------------------------------------------------------------------------------------------------------------------"
+echo -e "---------------------------------------------------------------------------------------------------------------------------------"
 echo -e " ${CYAN}管理命令:${PLAIN}"
 echo -e " ${YELLOW}info${PLAIN} (管理员信息) | ${YELLOW}net${PLAIN} (网络) | ${YELLOW}xw${PLAIN} (WARP分流) | ${YELLOW}swap${PLAIN}  (内存) | ${YELLOW}backup${PLAIN} (备份) | ${YELLOW}f2b${PLAIN} (防火墙) | ${YELLOW}sniff${PLAIN}  (流量嗅探)"
 echo -e " ${YELLOW}user${PLAIN} (多用户管理) | ${YELLOW}sni${PLAIN} (域名) | ${YELLOW}bt${PLAIN} (BT封禁)   | ${YELLOW}ports${PLAIN} (端口) | ${YELLOW}zone${PLAIN}   (时区) | ${YELLOW}bbr${PLAIN} (内核)   | ${YELLOW}update${PLAIN} (内核更新) | ${YELLOW}remove${PLAIN} (卸载)"
