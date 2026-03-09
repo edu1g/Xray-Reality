@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  utils.sh — 公共工具函数库
+#  utils.sh — 公共工具函数库 (全自动安装版)
 # ─────────────────────────────────────────────
 
 # ─── 颜色与标签定义 ──────────────────────────
@@ -12,17 +12,12 @@ WARN="${YELLOW}[WARN]${PLAIN}"
 ERR="${RED}[ERR] ${PLAIN}"
 OK="${GREEN}[OK]  ${PLAIN}"
 
-UI_SPINNER_FRAMES=("|" "/" "-" "\\")
-
 # ─── 进程锁文件 ──────────────────────────────
 _LOCK_FILE="/tmp/xray_install.lock"
 
 # ─── 任务执行封装 ────────────────────────────
 _cleanup() {
     rm -f "$_LOCK_FILE"
-    if [ -f /etc/resolv.conf.bak ]; then
-        cp /etc/resolv.conf.bak /etc/resolv.conf 2>/dev/null
-    fi
 }
 
 log_info() { echo -e "${INFO} $*"; }
@@ -50,6 +45,22 @@ execute_task() {
     fi
 }
 
+# ─── 修复：新增 Banner 函数 ──────────────────
+print_banner() {
+    clear
+    echo -e "${CYAN}"
+    echo " ██▀███  ▓█████  ▄▄▄       ██▓     ██▓▄▄▄█████▓ ▓██   ██▓"
+    echo "▓██ ▒ ██▒▓█   ▀ ▒████▄    ▓██▒    ▓██▒▓  ██▒ ▓▒  ▒██  ██▒"
+    echo "▓██ ░▄█ ▒▒███   ▒██  ▀█▄  ▒██░    ▒██▒▒ ▓██░ ▒░   ▒██ ██░"
+    echo "▒██▀▀█▄  ▒▓█  ▄ ░██▄▄▄▄██ ▒██░    ░██░░ ▓██▓ ░    ░ ▐██▓░"
+    echo "░██▓ ▒██▒░▒████▒ ▓█   ▓██▒░██████▒░██░  ▒██▒ ░    ░ ██▒▒ "
+    echo "░ ▒▓ ░▒▓░░░ ▒░ ░ ▒▒   ▓▒█░░ ▒░▓  ░░▓    ▒ ░░      ██▒░ "
+    echo "  ░▒ ░ ▒░ ░ ░  ░  ▒   ▒▒ ░░ ░ ▒  ░ ▒ ░    ░       ▓██ ░  "
+    echo "  ░░   ░    ░     ░   ▒     ░ ░    ▒ ░  ░         ▒ ▒    "
+    echo "   ░        ░  ░      ░  ░    ░  ░ ░              ░ ░    "
+    echo -e "${PLAIN}"
+}
+
 # ─── 进程锁获取 ──────────────────────────────
 lock_acquire() {
     if [ -f "$_LOCK_FILE" ]; then
@@ -67,39 +78,11 @@ lock_acquire() {
     return 0
 }
 
-# ─── 安装前确认 ──────────────────────────────
+# ─── 安装前确认 (已改为自动确认) ───────────────
 confirm_installation() {
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e "${RED}                    安装说明 (What's Included)                ${PLAIN}"
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e " ${CYAN}预计耗时${PLAIN}: 1 ~ 5 分钟（取决于网络环境）"
+    echo -e " ${CYAN}预计耗时${PLAIN}: 1 ~ 5 分钟（全自动安装模式）"
     echo -e " ${CYAN}支持系统${PLAIN}: Debian / Ubuntu (amd64 / arm64)"
-    echo -e " ${CYAN}项目地址${PLAIN}: https://github.com/ISFZY/Xray-Reality"
-    echo -e " ${CYAN}项目地址${PLAIN}: ${GREEN}https://github.com/uxswl/Xray-Reality ${YELLOW}(备用)${PLAIN}"
-    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e ""
-
-    local error_msg=""
-    while true; do
-        if [ -n "$error_msg" ]; then
-            echo -ne "\r\033[K${RED}${error_msg}${PLAIN} 确认继续安装? [y/n]: "
-        else
-            echo -ne "\r\033[K确认继续安装? [y/n]: "
-        fi
-        read -r key
-        case "$key" in
-            y|Y)
-                echo -e "\n${OK} 用户确认，开始执行安装程序。${PLAIN}"
-                break
-                ;;
-            n|N)
-                echo -e "\n${WARN} 用户取消安装。${PLAIN}"
-                exit 1
-                ;;
-            *)
-                error_msg="错误：必须输入 y 或 n！"
-                echo -ne "\033[1A"
-                ;;
-        esac
-    done
-}
+    echo -e " ${CYAN}项目地址${PLAIN}: ${GREEN}https
