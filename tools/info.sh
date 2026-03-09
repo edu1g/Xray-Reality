@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Xray 配置信息查看器 (已优化：直接显示订阅与二维码，无倒计时)
+#  Xray 配置信息查看器 (已修改：仅显示节点信息，移除订阅与二维码)
 # ─────────────────────────────────────────────────────────────────────────────
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
@@ -95,7 +95,7 @@ printf " ${CYAN}%-12s${PLAIN} : ${CYAN}端口:${PLAIN} %-6s ${CYAN}协议:${PLAI
 
 echo -e "${SEP}"
 
-# ─── vless 链接 ───
+# ─── vless 链接展示 (仅保留此部分) ───
 if [[ -n "$LINK_V4_VIS" ]]; then
     echo -e "\n${CYAN}IPv4 Vision:${PLAIN}"
     echo -e "${LINK_V4_VIS}"
@@ -110,73 +110,6 @@ if [[ -n "$LINK_V6_VIS" ]]; then
     echo -e "\n${CYAN}IPv6 XHTTP :${PLAIN}"
     echo -e "${LINK_V6_XHT}"
     echo ""
-fi
-
-# ─── 订阅二维码 ──────────────────────────
-if ! command -v qrencode &>/dev/null; then
-    echo -e "${RED}Error: 缺少 qrencode 依赖，无法生成二维码。${PLAIN}"
-elif ! command -v python3 &>/dev/null; then
-    echo -e "${RED}Error: 缺少 python3，无法启动临时订阅服务。${PLAIN}"
-else
-    # ─── 收集所有可用链接 ────────────────────
-    ALL_LINKS=""
-    [[ -n "$LINK_V4_VIS" ]] && ALL_LINKS+="${LINK_V4_VIS}\n"
-    [[ -n "$LINK_V4_XHT" ]] && ALL_LINKS+="${LINK_V4_XHT}\n"
-    [[ -n "$LINK_V6_VIS" ]] && ALL_LINKS+="${LINK_V6_VIS}\n"
-    [[ -n "$LINK_V6_XHT" ]] && ALL_LINKS+="${LINK_V6_XHT}\n"
-
-    if [ -n "$ALL_LINKS" ]; then
-        # ─── 选取空闲端口 ──────
-        _pick_sub_port() {
-            local port
-            for i in {1..100}; do
-                port=$(shuf -i 10000-65535 -n 1)
-                if ! lsof -i:"$port" -P -n >/dev/null 2>&1; then
-                    echo "$port"; return 0
-                fi
-            done
-            return 1
-        }
-
-        SUB_PORT=$(_pick_sub_port)
-        if [ -n "$SUB_PORT" ]; then
-            # 开启防火墙端口
-            iptables -I INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-            [ -f /proc/net/if_inet6 ] && ip6tables -I INPUT -p tcp --dport "$SUB_PORT" -j ACCEPT 2>/dev/null
-
-            # 生成订阅文件
-            SUB_DIR=$(mktemp -d)
-            printf "%b" "$ALL_LINKS" | base64 -w 0 > "$SUB_DIR/sub"
-
-            # 启动后台静默 HTTP 服务
-            nohup python3 -c "
-import http.server, os
-os.chdir('$SUB_DIR')
-class H(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *a): pass
-    def do_GET(self):
-        if self.path == '/sub':
-            with open('sub', 'rb') as f: content = f.read()
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/plain; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(content)
-http.server.HTTPServer(('0.0.0.0', $SUB_PORT), H).serve_forever()
-" >/dev/null 2>&1 &
-
-            # 显示结果
-            SUB_HOST="${IPV4:-[$IPV6]}"
-            [[ "$SUB_HOST" == "N/A" ]] && SUB_HOST="[$IPV6]"
-            SUB_URL="http://${SUB_HOST}:${SUB_PORT}/sub"
-
-            NODE_COUNT=$(printf "%b" "$ALL_LINKS" | grep -c 'vless://')
-            echo -e "\n${CYAN}订阅地址（含 ${NODE_COUNT} 个节点）:${PLAIN}"
-            echo -e "${YELLOW}${SUB_URL}${PLAIN}\n"
-            echo -e "${CYAN}订阅二维码:${PLAIN}\n"
-            qrencode -t ANSIUTF8 "${SUB_URL}"
-            echo -e ""
-        fi
-    fi
 fi
 
 # ─── 管理命令速查 ────────────────────────────
