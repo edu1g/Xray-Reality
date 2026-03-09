@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  4_config.sh — 生成 Xray 配置文件
+#  4_config.sh — 生成 Xray 配置文件 (已集成 status=23 修复)
 # ─────────────────────────────────────────────
 
 # ─── Xray 配置生成入口 ───────────────────────
@@ -32,23 +32,25 @@ core_config() {
     local keys_output
     keys_output=$("$XRAY_BIN" x25519)
 
-    # 先 grep 过滤行，再 awk 提取值，两步分离避免 tolower 与字段分割的兼容性问题
     PRIVATE_KEY=$(echo "$keys_output" | grep -iE "^PrivateKey:"          | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
     PUBLIC_KEY=$(echo  "$keys_output" | grep -iE "^(PublicKey|Password):" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
 
     SHORT_ID=$(openssl rand -hex 4)
     XHTTP_PATH="/$(openssl rand -hex 4)"
 
-    # 非空校验，不对密钥格式做假设，对 Xray 版本变化具备更强的容错性
     if [ -z "$UUID" ] || [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
-        echo -e "${ERR} 密钥生成失败或解析异常（UUID=${UUID:-空}, PrivKey=${PRIVATE_KEY:-空}, PubKey=${PUBLIC_KEY:-空}），无法继续。"
+        echo -e "${ERR} 密钥生成失败或解析异常，无法继续。"
         exit 1
     fi
 
     # ─── config.json 写入 ────────────────────
     cat > /usr/local/etc/xray/config.json <<EOF
 {
-  "log": { "loglevel": "warning" },
+  "log": { 
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
   "dns": { "servers": [ "localhost" ] },
   "inbounds": [
     {
@@ -111,7 +113,21 @@ core_config() {
 }
 EOF
 
+    # ─── 关键修复：初始化日志目录与权限 ───
+    # 解决 status=23 报错的核心步骤
+    echo -e "${INFO} 正在初始化日志权限..."
+    mkdir -p /var/log/xray/
+    if getent group nogroup > /dev/null; then
+        chown -R nobody:nogroup /var/log/xray/
+    else
+        chown -R nobody:nobody /var/log/xray/
+    fi
+    chmod -R 755 /var/log/xray/
+
     # ─── Systemd 服务覆写配置 ────────────────
+    # 清除可能存在的第三方冲突配置文件
+    rm -f /etc/systemd/system/xray.service.d/10-donot_touch_single_conf.conf
+
     mkdir -p /etc/systemd/system/xray.service.d
     cat > /etc/systemd/system/xray.service.d/override.conf <<EOF
 [Service]
@@ -126,7 +142,7 @@ EOF
     if "$XRAY_BIN" run -test -confdir /usr/local/etc/xray >/dev/null 2>&1; then
         echo -e "${OK} Xray 配置验证通过 (Syntax OK)"
     else
-        echo -e "${RED}[FATAL] 生成的配置文件无效，请检查 Xray 版本或配置语法。${PLAIN}"
+        echo -e "${RED}[FATAL] 生成的配置文件无效。${PLAIN}"
         "$XRAY_BIN" run -test -confdir /usr/local/etc/xray
         exit 1
     fi
