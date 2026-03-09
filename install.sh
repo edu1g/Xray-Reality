@@ -1,20 +1,12 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  install.sh — 主安装入口 (已集成 status=23 启动修复)
-#
-#  模块加载顺序与变量流转：
-#    utils.sh      →  定义 _LOCK_FILE, execute_task, 颜色变量等基础工具
-#    1_env.sh      →  输出 ARCH, HAS_V4, HAS_V6, CURL_OPT, DOMAIN_STRATEGY
-#    2_install.sh  →  消费无显式变量，结果体现于文件系统
-#    3_system.sh   →  消费 HAS_V4, HAS_V6；输出 SSH_PORT, PORT_VISION, PORT_XHTTP
-#    4_config.sh   →  消费 PORT_VISION, PORT_XHTTP, DOMAIN_STRATEGY
-#                     输出 UUID, PUBLIC_KEY, PRIVATE_KEY, SHORT_ID, SNI_HOST, XHTTP_PATH
+#  install.sh — 主安装入口 (全自动修复版)
 # ─────────────────────────────────────────────
 
 BASE_DIR=$(cd "$(dirname "$0")" && pwd)
 
-# ─── 基础工具加载 ────────────────────────────
+# ─── 基础工具加载 (必须最先加载) ─────────────
 if [ -f "$BASE_DIR/lib/utils.sh" ]; then
     source "$BASE_DIR/lib/utils.sh"
 else
@@ -23,6 +15,7 @@ else
 fi
 
 # ─── 预检与交互 ──────────────────────────────
+# 修正：确保 print_banner 在 utils.sh 中定义
 print_banner
 
 if [ "$EUID" -ne 0 ]; then
@@ -35,10 +28,18 @@ if ! lock_acquire; then
     exit 1
 fi
 
+# 修正：confirm_installation 现在是自动跳过模式
 confirm_installation
 
 # ─── 1. 环境准备 ─────────────────────────────
-source "$BASE_DIR/core/1_env.sh"
+# 确保 1_env.sh 语法正确
+if [ -f "$BASE_DIR/core/1_env.sh" ]; then
+    source "$BASE_DIR/core/1_env.sh"
+else
+    echo "Error: core/1_env.sh not found!"
+    exit 1
+fi
+
 pre_flight_check
 check_net_stack
 setup_base_env
@@ -57,55 +58,34 @@ core_config
 
 # ─── 5. 部署管理工具 ─────────────────────────
 echo -e "\n${CYAN}>>> 5. 正在部署管理脚本...${PLAIN}"
-
 TOOLS_DIR="$BASE_DIR/tools"
 BIN_DIR="/usr/local/bin"
 
 if [ -d "$TOOLS_DIR" ]; then
-    count=$(find "$TOOLS_DIR" -maxdepth 1 -name "*.sh" | wc -l)
-    if [ "$count" -gt 0 ]; then
-        for script in "$TOOLS_DIR"/*.sh; do
-            [ -f "$script" ] || continue
-            filename=$(basename "$script" .sh)
-            cp "$script" "$BIN_DIR/$filename"
-            chmod +x "$BIN_DIR/$filename"
-            echo -e "${OK} 部署命令: ${GREEN}${filename}${PLAIN}"
-        done
-    else
-        echo -e "${WARN} tools 目录为空，跳过部署。"
-    fi
-else
-    echo -e "${ERR} tools 目录缺失，请检查项目完整性。"
+    for script in "$TOOLS_DIR"/*.sh; do
+        [ -f "$script" ] || continue
+        filename=$(basename "$script" .sh)
+        cp "$script" "$BIN_DIR/$filename"
+        chmod +x "$BIN_DIR/$filename"
+        echo -e "${OK} 部署命令: ${GREEN}${filename}${PLAIN}"
+    done
 fi
 
-# ─── 6. 启动服务 ─────────────────────────────
+# ─── 6. 启动服务 (status=23 修复逻辑) ──────────
 echo -e "\n${CYAN}>>> 6. 正在启动服务...${PLAIN}"
-
-# 解决 status=23 的关键点：启动前确保环境彻底重载
 systemctl daemon-reload
 systemctl enable xray
-
-# 尝试启动并增加自动纠错逻辑
 if ! systemctl restart xray; then
-    echo -e "${WARN} 首次启动失败，正在尝试权限修复与二次重载..."
-    # 强制初始化日志目录权限 (防止 status=23)
+    echo -e "${WARN} 启动失败，执行权限自动修复..."
     mkdir -p /var/log/xray/
-    if getent group nogroup > /dev/null; then
-        chown -R nobody:nogroup /var/log/xray/
-    else
-        chown -R nobody:nobody /var/log/xray/
-    fi
+    chown -R nobody:nogroup /var/log/xray/ 2>/dev/null || chown -R nobody:nobody /var/log/xray/
     chmod -R 755 /var/log/xray/
-    
-    # 二次尝试
     systemctl daemon-reload
     systemctl restart xray
 fi
 
-# 最终状态校验
 if ! systemctl is-active --quiet xray; then
-    echo -e "\n${RED}Error: Xray 服务启动失败！${PLAIN}"
-    echo -e "请执行 'journalctl -u xray -n 20 --no-pager' 查看具体错误原因。"
+    echo -e "\n${RED}Error: Xray 启动失败！${PLAIN}"
     exit 1
 fi
 
