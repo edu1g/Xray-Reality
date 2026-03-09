@@ -8,6 +8,7 @@
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
 INFO="${CYAN}[INFO]${PLAIN}"; WARN="${YELLOW}[WARN]${PLAIN}"; ERR="${RED}[ERR] ${PLAIN}"; OK="${GREEN}[OK]  ${PLAIN}"
 
+UI_SPINNER_FRAMES=("|" "/" "-" "\\")
 _LOCK_FILE="/tmp/xray_install.lock"
 
 # ─── 基础工具函数 ───
@@ -37,7 +38,7 @@ lock_acquire() {
     return 0
 }
 
-# ─── 全自动确认函数 (关键修改) ───
+# ─── 全自动确认函数 (3秒自动跳过) ───
 confirm_installation() {
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e "${RED}                    安装说明 (What's Included)                ${PLAIN}"
