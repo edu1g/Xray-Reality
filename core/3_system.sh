@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  3_system.sh — 安全与防火墙配置
+#  3_system.sh — 安全与防火墙配置及网络优化
 # ─────────────────────────────────────────────
 
 # ─── 随机可用端口获取 ────────────────────────
@@ -67,6 +67,34 @@ setup_firewall_and_security() {
     echo -e "${OK} SSH    端口 : ${GREEN}${SSH_PORT}${PLAIN}"
     echo -e "${OK} Vision 端口 : ${GREEN}${PORT_VISION}${PLAIN}"
     echo -e "${OK} XHTTP  端口 : ${GREEN}${PORT_XHTTP}${PLAIN}"
+
+    # ─── 默认启用 BBR + CAKE 优化 ───
+    # 自动检测并应用最优队列调度算法
+    echo -e "${INFO} 正在优化网络内核参数 (BBR + CAKE)..."
+    
+    # 检查内核模块支持情况 (CAKE 通常需要内核 4.19+)
+    if modprobe sch_cake >/dev/null 2>&1; then
+        local qdisc="cake"
+    else
+        local qdisc="fq" # 若不支持 CAKE 则回退到 FQ
+    fi
+
+    cat > /etc/sysctl.d/99-xray-bbr.conf <<EOF
+# 启用 BBR 拥塞控制与 FQ/CAKE 队列
+net.core.default_qdisc = $qdisc
+net.ipv4.tcp_congestion_control = bbr
+
+# 基础网络性能加固
+fs.file-max = 1000000
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_mtu_probing = 1
+EOF
+    sysctl -p /etc/sysctl.d/99-xray-bbr.conf >/dev/null 2>&1
+    echo -e "${OK} 网络优化已应用: ${GREEN}BBR + $qdisc${PLAIN}"
 
     # ─── Fail2ban 配置 ───────────────────────
     cat > /etc/fail2ban/jail.local <<EOF
