@@ -7,7 +7,7 @@
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; PLAIN="\033[0m"
 
 INSTALL_DIR="xray-install"
-REPO_URL="https://github.com/uxswl/Xray-Reality.git"
+REPO_URL="https://github.com/edu1g/Xray-Reality.git"
 
 # ─── 分支选择 ────────────────────────────────
 TARGET_BRANCH="${VERSION:-${1:-main}}"
