@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  Xray WARP 分流管理器 (重构版)
+#  Xray WARP 分流管理器 (界面与逻辑深度重构版)
 # ─────────────────────────────────────────────
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
@@ -28,10 +28,10 @@ get_main_ip() {
     echo -e "${CYAN}${res}${PLAIN}"
 }
 
-get_split_domains() {
-    local domains
-    domains=$(jq -r '.routing.rules[] | select(.outboundTag=="warp_proxy") | .domain[]' "$CONFIG_FILE" 2>/dev/null | xargs)
-    if [ -n "$domains" ]; then echo -e "${YELLOW}${domains}${PLAIN}"; else echo -e "${GRAY}未配置${PLAIN}"; fi
+_get_domains_by_tag() {
+    local tag=$1
+    local res=$(jq -r --arg t "$tag" '.routing.rules[] | select(.outboundTag==$t) | .domain[]' "$CONFIG_FILE" 2>/dev/null | xargs)
+    [ -n "$res" ] && echo -e "${YELLOW}${res}${PLAIN}" || echo -e "${GRAY}未配置${PLAIN}"
 }
 
 check_warp_socket() {
@@ -42,69 +42,66 @@ check_xray_outbound() {
     jq -e '.outbounds[] | select(.tag=="warp_proxy")' "$CONFIG_FILE" >/dev/null 2>&1
 }
 
-ensure_outbound() {
-    if check_xray_outbound; then return; fi
-    local out_obj='{"tag": "warp_proxy", "protocol": "socks", "settings": {"servers": [{"address": "127.0.0.1", "port": '$WARP_PORT'}]}}'
-    jq --argjson obj "$out_obj" '.outbounds += [$obj]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-}
-
 # ─── 核心功能实现 ─────────────────────────────
 
-# 1. 安装/重装 WARP
 install_warp() {
     clear
     echo -e "\n${CYAN}正在全自动安装 WARP (Socks5 模式 - 端口 $WARP_PORT)...${PLAIN}"
-    # 调用外部脚本并预填参数：2(中文) -> [回车](默认端口)
     printf "2\n\n" | bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) c
-    ensure_outbound
+    if ! check_xray_outbound; then
+        local out_obj='{"tag": "warp_proxy", "protocol": "socks", "settings": {"servers": [{"address": "127.0.0.1", "port": '$WARP_PORT'}]}}'
+        jq --argjson obj "$out_obj" '.outbounds += [$obj]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    fi
     systemctl restart xray >/dev/null 2>&1
     UI_MESSAGE="${GREEN}WARP 安装及 Xray 接口配置完成。${PLAIN}"
 }
 
-# 2. 卸载 WARP
 uninstall_warp() {
     bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) u
-    # 清理 Xray 中的相关分流规则
     jq 'del(.outbounds[] | select(.tag=="warp_proxy")) | del(.routing.rules[] | select(.outboundTag=="warp_proxy"))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
     systemctl restart xray >/dev/null 2>&1
     UI_MESSAGE="${YELLOW}WARP 已卸载并清理分流规则。${PLAIN}"
 }
 
-# 3. 更换出口 IP (刷取新 IP)
-rotate_ip() {
-    echo -e "${CYAN}正在刷取 WARP 出口 IP...${PLAIN}"
-    # 使用 fscarmen 脚本提供的更换 IP 指令
-    bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) i
-    UI_MESSAGE="${GREEN}出口 IP 刷取指令已执行。${PLAIN}"
-}
-
-# 4. 更换出口地域
+rotate_ip() { bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) i; UI_MESSAGE="${GREEN}出口 IP 刷取指令已执行。${PLAIN}"; }
 change_region() {
     echo -ne "${YELLOW}请输入目标地域代码 (如 hk, sg, jp, us): ${PLAIN}"
     read -r region
-    if [ -n "$region" ]; then
-        # 调用脚本的地域指定功能
-        bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) e "$region"
-        UI_MESSAGE="${GREEN}地域切换至 ${region} 尝试完成。${PLAIN}"
-    fi
+    [ -n "$region" ] && bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) e "$region"
+    UI_MESSAGE="${GREEN}地域切换指令已发送。${PLAIN}"
 }
 
-# 5. 添加/删除 自定义分流域名
-toggle_custom_domain() {
-    echo -ne "${YELLOW}请输入要添加或删除的域名 (例如 netflix.com): ${PLAIN}"
+manage_domain_rule() {
+    local target_tag=$1
+    local desc=$2
+    echo -ne "${YELLOW}请输入要操作的域名或 GeoSite (例如 geosite:google): ${PLAIN}"
     read -r input_domain
     [ -z "$input_domain" ] && return
-    ensure_outbound
-    if jq -e --arg d "$input_domain" '.routing.rules[] | select(.outboundTag=="warp_proxy" and (.domain // [] | contains([$d])))' "$CONFIG_FILE" >/dev/null 2>&1; then
-        jq --arg d "$input_domain" '(.routing.rules[] | select(.outboundTag=="warp_proxy")).domain |= map(select(. != $d))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
-        UI_MESSAGE="${YELLOW}已移除分流域名: $input_domain${PLAIN}"
+
+    tmp=$(mktemp)
+    # 步骤1: 先移除该域名在所有规则中的存在
+    jq --arg d "$input_domain" '
+        .routing.rules |= map(
+            if .domain then .domain |= map(select(. != $d)) else . end
+        ) | .routing.rules |= map(select(.domain == null or (.domain | length > 0)))
+    ' "$CONFIG_FILE" > "$tmp"
+
+    # 步骤2: 检查是否需要添加（若之前不在目标 tag 下则添加）
+    if ! jq -e --arg d "$input_domain" --arg t "$target_tag" '.routing.rules[] | select(.outboundTag==$t and (.domain // [] | contains([$d])))' "$CONFIG_FILE" >/dev/null 2>&1; then
+        # 构造新规则并强制排序：Direct 规则置顶，Proxy 规则随后
+        local new_rule="{\"type\": \"field\", \"domain\": [\"$input_domain\"], \"outboundTag\": \"$target_tag\"}"
+        jq --argjson rule "$new_rule" '.routing.rules += [$rule]' "$tmp" > "${tmp}.new"
+        # 核心逻辑：重构 rules 数组顺序，确保 outboundTag 为 direct 的在前
+        jq '(.routing.rules | map(select(.outboundTag == "direct"))) + (.routing.rules | map(select(.outboundTag != "direct")))' "${tmp}.new" > "$tmp"
+        rm -f "${tmp}.new"
+        UI_MESSAGE="${GREEN}已添加 ${desc}: $input_domain${PLAIN}"
     else
-        local new_rule="{\"type\": \"field\", \"domain\": [\"$input_domain\"], \"outboundTag\": \"warp_proxy\"}"
-        jq --argjson rule "$new_rule" '.routing.rules = [$rule] + .routing.rules' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
-        UI_MESSAGE="${GREEN}已添加分流域名: $input_domain${PLAIN}"
+        UI_MESSAGE="${YELLOW}已移除 ${desc}: $input_domain${PLAIN}"
     fi
-    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    
+    mv "$tmp" "$CONFIG_FILE"
     systemctl restart xray >/dev/null 2>&1
+    rm -f "$tmp"
 }
 
 # ─── 菜单界面 ────────────────────────────────
@@ -116,16 +113,19 @@ show_menu() {
     echo -e "${CYAN}===================================================${PLAIN}"
     echo -e "${CYAN}           WARP 分流管理面板 (Xray Warp)          ${PLAIN}"
     echo -e "${CYAN}===================================================${PLAIN}"
-    echo -e " Warp 服务 : ${STATUS_SOCK}    Xray 接口: ${STATUS_XRAY}"
+    echo -e " Warp 服务 : ${STATUS_SOCK}"
+    echo -e " Xray 接口 : ${STATUS_XRAY}"
     echo -e " Warp IP   : $(get_warp_ip)"
     echo -e " 默认出口  : $(get_main_ip)"
-    echo -e " 分流域名  : $(get_split_domains)"
+    echo -e " 直连域名  : $(_get_domains_by_tag 'direct')"
+    echo -e " WARP 域名 : $(_get_domains_by_tag 'warp_proxy')"
     echo -e "---------------------------------------------------"
     echo -e " 1. 安装/重装 WARP    ${GRAY}(自动配置 Socks5 端口 40000)${PLAIN}"
     echo -e " 2. 卸载 WARP         ${GRAY}(清理分流规则)${PLAIN}"
-    echo -e " 3. 更换出口 IP       ${GRAY}(刷取新 IP 解决流控)${PLAIN}"
+    echo -e " 3. 更换出口 IP       ${GRAY}(刷取新的 IP )${PLAIN}"
     echo -e " 4. 更换出口地域      ${GRAY}(指定地域，如 hk, sg, jp, us)${PLAIN}"
-    echo -e " 5. 添加/删除 自定义分流域名${PLAIN}"
+    echo -e " 5. 添加/删除 直连分流 ${GRAY}(油管无广告)${PLAIN}"
+    echo -e " 6. 添加/删除 WARP 分流 ${GRAY}(谷歌无内陆)${PLAIN}"
     echo -e "---------------------------------------------------"
     echo -e " 0. 退出 (Exit)"
     echo -e "==================================================="
@@ -139,13 +139,14 @@ show_menu() {
 # ─── 主循环 ──────────────────────────────────
 while true; do
     show_menu
-    read -r -p "请输入选项 [0-5]: " choice
+    read -r -p "请输入选项 [0-6]: " choice
     case "$choice" in
         1) install_warp ;;
         2) uninstall_warp ;;
         3) rotate_ip ;;
         4) change_region ;;
-        5) toggle_custom_domain ;;
+        5) manage_domain_rule "direct" "直连分流" ;;
+        6) manage_domain_rule "warp_proxy" "WARP 分流" ;;
         0) exit 0 ;;
         *) UI_MESSAGE="${RED}无效选项${PLAIN}" ;;
     esac
