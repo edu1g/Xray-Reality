@@ -1,20 +1,18 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  4_config.sh — 生成 Xray 配置文件 (冲突清理与架构修复版)
+#  4_config.sh — 生成 Xray 配置文件 (深度修复版)
 # ─────────────────────────────────────────────
 
 core_config() {
     echo -e "\n${CYAN}--- 4. 生成 Xray 配置文件 (Config) ---${PLAIN}"
 
-    # 1. 深度清理冲突的 Drop-in 配置 [解决 status=23 报错的关键]
+    # 1. 强力清理冲突的 Drop-in 配置 [解决 status=23 报错的关键]
     echo -e "${INFO} 正在检查并清理系统冲突配置..."
     local dropin_dir="/etc/systemd/system/xray.service.d"
     
-    # 强制删除可能导致读取失败的第三方残留文件
+    # 强制删除可能导致读取失败的残留文件
     rm -f "${dropin_dir}/10-donot_touch_single_conf.conf"
-    
-    # 确保目录存在
     mkdir -p "$dropin_dir"
 
     # 2. 基础参数校验
@@ -30,11 +28,12 @@ core_config() {
     # 3. 动态生成密钥与 UUID
     UUID=$("$XRAY_BIN" uuid)
     keys_output=$("$XRAY_BIN" x25519)
+    # 提取私钥
     PRIVATE_KEY=$(echo "$keys_output" | grep -iE "^PrivateKey:" | awk -F':' '{print $2}' | tr -d ' \r\n')
     SHORT_ID=$(openssl rand -hex 4)
     XHTTP_PATH="/$(openssl rand -hex 4)"
 
-    # 4. 写入完整且纯净的 config.json (包含必要的 Inbounds 和 Outbounds)
+    # 4. 写入完整架构的 config.json (包含 Inbounds 和 Outbounds)
     cat > /usr/local/etc/xray/config.json <<EOF
 {
   "log": { 
@@ -105,3 +104,25 @@ core_config() {
       { "type": "field", "ip": [ "geoip:private" ], "outboundTag": "block" },
       { "type": "field", "protocol": [ "bittorrent" ], "outboundTag": "block" }
     ]
+  }
+}
+EOF
+
+    # 5. 权限补救 (解决日志写入权限导致的启动失败)
+    echo -e "${INFO} 正在初始化日志权限..."
+    mkdir -p /var/log/xray/
+    chown -R nobody:nogroup /var/log/xray/ 2>/dev/null || chown -R nobody:nobody /var/log/xray/
+    chmod -R 755 /var/log/xray/
+
+    # 6. 重新生成标准 override.conf
+    cat > "${dropin_dir}/override.conf" <<EOF
+[Service]
+LimitNOFILE=infinity
+LimitNPROC=65535
+TasksMax=infinity
+Environment="XRAY_LOCATION_ASSET=/usr/local/share/xray/"
+EOF
+
+    systemctl daemon-reload >/dev/null 2>&1
+    echo -e "${OK} Xray 架构修复完成，配置文件已生成。"
+}
