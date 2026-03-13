@@ -1,45 +1,58 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  4_config.sh — 修复版：保留原节点信息 + 解决冲突
+#  4_config.sh — 生成 Xray 配置文件 (深度修复与架构优化版)
 # ─────────────────────────────────────────────
 
+# ─── Xray 配置生成入口 ───────────────────────
 core_config() {
     echo -e "\n${CYAN}--- 4. 生成 Xray 配置文件 (Config) ---${PLAIN}"
 
-    # 1. 强力清理系统级冲突配置 [解决 status=23]
+    # ─── 1. 强力清理冲突配置 [解决 status=23] ────────────────
+    echo -e "${INFO} 正在检查并清理系统冲突配置..."
     local dropin_dir="/etc/systemd/system/xray.service.d"
-    rm -rf "${dropin_dir}/10-donot_touch_single_conf.conf"
+    # 强制删除可能导致读取失败的第三方残留文件
+    rm -f "${dropin_dir}/10-donot_touch_single_conf.conf"
     mkdir -p "$dropin_dir"
 
-    # 2. 环境与变量准备
+    # ─── 2. 参数与环境校验 ──────────────────────
+    if [ -z "$PORT_VISION" ] || [ -z "$PORT_XHTTP" ]; then
+        echo -e "${RED}[FATAL] 端口参数丢失，请检查系统配置步骤。${PLAIN}"
+        exit 1
+    fi
+
+    SNI_HOST="www.icloud.com"
     XRAY_BIN="/usr/local/bin/xray"
     OLD_CONFIG="/usr/local/etc/xray/config.json"
     mkdir -p /usr/local/etc/xray
 
-    # 3. 智能读取或生成节点信息 [防止删除节点信息]
-    if [ -f "$OLD_CONFIG" ] && command -v jq &>/dev/null; then
-        echo -e "${INFO} 检测到旧配置，正在提取原有节点信息..."
-        UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$OLD_CONFIG")
-        PRIVATE_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey' "$OLD_CONFIG")
-        SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0]' "$OLD_CONFIG")
-        XHTTP_PATH=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .streamSettings.xhttpSettings.path' "$OLD_CONFIG")
-        # 端口保护：如果外部传入的端口为空，则沿用旧配置端口
-        [ -z "$PORT_VISION" ] && PORT_VISION=$(jq -r '.inbounds[] | select(.tag=="vision_node") | .port' "$OLD_CONFIG")
-        [ -z "$PORT_XHTTP" ] && PORT_XHTTP=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .port' "$OLD_CONFIG")
+    if [ ! -x "$XRAY_BIN" ]; then
+        echo -e "${RED}[FATAL] 找不到 Xray 核心文件或不可执行。${PLAIN}"
+        exit 1
     fi
 
-    # 兜底逻辑：如果提取失败或为首次安装，则生成新信息
+    # ─── 3. 智能读取或生成节点信息 [防止解析 null 错误] ──────
+    # 预检：只有当文件存在且是合法 JSON 时才尝试提取
+    if [ -f "$OLD_CONFIG" ] && jq . "$OLD_CONFIG" >/dev/null 2>&1; then
+        echo -e "${INFO} 检测到旧配置且格式正确，正在提取原有节点信息..."
+        UUID=$(jq -r '.inbounds[0].settings.clients[0].id // empty' "$OLD_CONFIG")
+        PRIVATE_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.privateKey // empty' "$OLD_CONFIG")
+        SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$OLD_CONFIG")
+        XHTTP_PATH=$(jq -r '.inbounds[] | select(.tag=="xhttp_node") | .streamSettings.xhttpSettings.path // empty' "$OLD_CONFIG")
+    else
+        echo -e "${WARN} 旧配置不存在或已损坏，将生成全新的节点信息..."
+    fi
+
+    # 兜底生成逻辑
     [ -z "$UUID" ] && UUID=$("$XRAY_BIN" uuid)
-    [ -z "$PRIVATE_KEY" ] && PRIVATE_KEY=$("$XRAY_BIN" x25519 | grep -iE "^PrivateKey:" | awk -F':' '{print $2}' | tr -d ' \r\n')
+    if [ -z "$PRIVATE_KEY" ]; then
+        keys_output=$("$XRAY_BIN" x25519)
+        PRIVATE_KEY=$(echo "$keys_output" | grep -iE "^PrivateKey:" | head -n 1 | awk -F':' '{print $2}' | tr -d ' \r\n')
+    fi
     [ -z "$SHORT_ID" ] && SHORT_ID=$(openssl rand -hex 4)
     [ -z "$XHTTP_PATH" ] && XHTTP_PATH="/$(openssl rand -hex 4)"
-    [ -z "$PORT_VISION" ] && PORT_VISION=443
-    [ -z "$PORT_XHTTP" ] && PORT_XHTTP=8080
 
-    SNI_HOST="www.icloud.com"
-
-    # 4. 写入完整架构 config.json (包含 Inbounds 与 Outbounds)
+    # ─── 4. config.json 写入 (包含完整架构) ────────────────────
     cat > /usr/local/etc/xray/config.json <<EOF
 {
   "log": { 
@@ -114,12 +127,14 @@ core_config() {
 }
 EOF
 
-    # 5. 初始化系统权限
+    # ─── 5. 权限与日志初始化 ────────────────────────
+    echo -e "${INFO} 正在初始化日志权限..."
     mkdir -p /var/log/xray/
     chown -R nobody:nogroup /var/log/xray/ 2>/dev/null || chown -R nobody:nobody /var/log/xray/
     chmod -R 755 /var/log/xray/
 
-    cat > "${dropin_dir}/override.conf" <<EOF
+    # ─── 6. Systemd 服务覆写配置 ────────────────────
+    cat > /etc/systemd/system/xray.service.d/override.conf <<EOF
 [Service]
 LimitNOFILE=infinity
 LimitNPROC=65535
@@ -127,6 +142,16 @@ TasksMax=infinity
 Environment="XRAY_LOCATION_ASSET=/usr/local/share/xray/"
 EOF
 
+    # ─── 7. 配置文件有效性验证 ──────────────────────
+    echo -e "${INFO} 正在验证配置文件有效性..."
+    if "$XRAY_BIN" run -test -confdir /usr/local/etc/xray >/dev/null 2>&1; then
+        echo -e "${OK} Xray 配置验证通过 (Syntax OK)"
+    else
+        echo -e "${RED}[FATAL] 生成的配置文件无效。${PLAIN}"
+        "$XRAY_BIN" run -test -confdir /usr/local/etc/xray
+        exit 1
+    fi
+
     systemctl daemon-reload >/dev/null 2>&1
-    echo -e "${OK} Xray 节点信息已保留，配置文件更新完毕。"
+    echo -e "${OK} Xray 配置文件生成完毕。"
 }
