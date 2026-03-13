@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────
-#  Xray WARP 分流管理器 (界面与逻辑深度重构版)
+#  Xray WARP 分流管理器 (分流核心 BUG 修复版)
 # ─────────────────────────────────────────────
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; GRAY="\033[90m"; PLAIN="\033[0m"
@@ -30,7 +30,7 @@ get_main_ip() {
 
 _get_domains_by_tag() {
     local tag=$1
-    local res=$(jq -r --arg t "$tag" '.routing.rules[] | select(.outboundTag==$t) | .domain[]' "$CONFIG_FILE" 2>/dev/null | xargs)
+    local res=$(jq -r --arg t "$tag" '.routing.rules[]? | select(.outboundTag==$t and .domain != null) | .domain[]' "$CONFIG_FILE" 2>/dev/null | xargs)
     [ -n "$res" ] && echo -e "${YELLOW}${res}${PLAIN}" || echo -e "${GRAY}未配置${PLAIN}"
 }
 
@@ -39,7 +39,7 @@ check_warp_socket() {
 }
 
 check_xray_outbound() {
-    jq -e '.outbounds[] | select(.tag=="warp_proxy")' "$CONFIG_FILE" >/dev/null 2>&1
+    jq -e '.outbounds[]? | select(.tag=="warp_proxy")' "$CONFIG_FILE" >/dev/null 2>&1
 }
 
 # ─── 核心功能实现 ─────────────────────────────
@@ -58,7 +58,7 @@ install_warp() {
 
 uninstall_warp() {
     bash <(curl -sL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh) u
-    jq 'del(.outbounds[] | select(.tag=="warp_proxy")) | del(.routing.rules[] | select(.outboundTag=="warp_proxy"))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    jq 'del(.outbounds[]? | select(.tag=="warp_proxy")) | del(.routing.rules[]? | select(.outboundTag=="warp_proxy"))' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
     systemctl restart xray >/dev/null 2>&1
     UI_MESSAGE="${YELLOW}WARP 已卸载并清理分流规则。${PLAIN}"
 }
@@ -78,30 +78,31 @@ manage_domain_rule() {
     read -r input_domain
     [ -z "$input_domain" ] && return
 
-    tmp=$(mktemp)
-    # 步骤1: 先移除该域名在所有规则中的存在
-    jq --arg d "$input_domain" '
-        .routing.rules |= map(
-            if .domain then .domain |= map(select(. != $d)) else . end
-        ) | .routing.rules |= map(select(.domain == null or (.domain | length > 0)))
-    ' "$CONFIG_FILE" > "$tmp"
-
-    # 步骤2: 检查是否需要添加（若之前不在目标 tag 下则添加）
-    if ! jq -e --arg d "$input_domain" --arg t "$target_tag" '.routing.rules[] | select(.outboundTag==$t and (.domain // [] | contains([$d])))' "$CONFIG_FILE" >/dev/null 2>&1; then
-        # 构造新规则并强制排序：Direct 规则置顶，Proxy 规则随后
-        local new_rule="{\"type\": \"field\", \"domain\": [\"$input_domain\"], \"outboundTag\": \"$target_tag\"}"
-        jq --argjson rule "$new_rule" '.routing.rules += [$rule]' "$tmp" > "${tmp}.new"
-        # 核心逻辑：重构 rules 数组顺序，确保 outboundTag 为 direct 的在前
-        jq '(.routing.rules | map(select(.outboundTag == "direct"))) + (.routing.rules | map(select(.outboundTag != "direct")))' "${tmp}.new" > "$tmp"
-        rm -f "${tmp}.new"
-        UI_MESSAGE="${GREEN}已添加 ${desc}: $input_domain${PLAIN}"
-    else
+    # 1. 检查域名是否已存在
+    if jq -e --arg d "$input_domain" '.routing.rules[]? | select(.domain != null) | .domain[] | select(. == $d)' "$CONFIG_FILE" >/dev/null 2>&1; then
+        # 存在则执行：安全移除
+        jq --arg d "$input_domain" '
+            .routing.rules |= map(
+                if .domain then
+                    .domain |= map(select(. != $d))
+                else . end
+            ) | .routing.rules |= map(select(.domain == null or (.domain | length > 0)))
+        ' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
         UI_MESSAGE="${YELLOW}已移除 ${desc}: $input_domain${PLAIN}"
+    else
+        # 不存在则执行：安全添加并重排顺序 (保护整个 JSON 结构)
+        local new_rule="{\"type\": \"field\", \"domain\": [\"$input_domain\"], \"outboundTag\": \"$target_tag\"}"
+        jq --argjson rule "$new_rule" '
+            .routing.rules += [$rule] |
+            .routing.rules |= (
+                map(select(.outboundTag == "direct")) + map(select(.outboundTag != "direct"))
+            )
+        ' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
+        UI_MESSAGE="${GREEN}已添加 ${desc}: $input_domain${PLAIN}"
     fi
     
-    mv "$tmp" "$CONFIG_FILE"
+    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
     systemctl restart xray >/dev/null 2>&1
-    rm -f "$tmp"
 }
 
 # ─── 菜单界面 ────────────────────────────────
@@ -122,10 +123,10 @@ show_menu() {
     echo -e "---------------------------------------------------"
     echo -e " 1. 安装/重装 WARP    ${GRAY}(自动配置 Socks5 端口 40000)${PLAIN}"
     echo -e " 2. 卸载 WARP         ${GRAY}(清理分流规则)${PLAIN}"
-    echo -e " 3. 更换出口 IP       ${GRAY}(刷取新的 IP )${PLAIN}"
+    echo -e " 3. 更换出口 IP       ${GRAY}(刷取新 IP 解决流控)${PLAIN}"
     echo -e " 4. 更换出口地域      ${GRAY}(指定地域，如 hk, sg, jp, us)${PLAIN}"
-    echo -e " 5. 添加/删除 直连分流 ${GRAY}(油管无广告)${PLAIN}"
-    echo -e " 6. 添加/删除 WARP 分流 ${GRAY}(谷歌无内陆)${PLAIN}"
+    echo -e " 5. 添加/删除 直连分流 ${GRAY}(本地代理)${PLAIN}"
+    echo -e " 6. 添加/删除 WARP 分流 ${GRAY}(WARP 代理)${PLAIN}"
     echo -e "---------------------------------------------------"
     echo -e " 0. 退出 (Exit)"
     echo -e "==================================================="
