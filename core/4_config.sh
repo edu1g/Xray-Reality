@@ -127,6 +127,11 @@ core_config() {
 }
 EOF
 
+    # 强制开放父目录及配置文件权限，保证 Xray 降权运行不报错
+    chmod 755 /usr/local/etc
+    chmod 755 /usr/local/etc/xray
+    chmod 644 /usr/local/etc/xray/config.json
+
     # ─── 5. 权限与日志初始化 ────────────────────────
     echo -e "${INFO} 正在初始化日志权限..."
     mkdir -p /var/log/xray/
