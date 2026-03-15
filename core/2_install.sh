@@ -75,6 +75,8 @@ size_site=\$(du -k "\$tmp_site" | awk '{print \$1}')
 if [ "\${size_ip:-0}" -gt 1000 ] && [ "\${size_site:-0}" -gt 1000 ]; then
     mv -f "\$tmp_ip"   "\$SHARE_DIR/geoip.dat"
     mv -f "\$tmp_site" "\$SHARE_DIR/geosite.dat"
+    # 强制修复更新后的文件权限
+    chmod 644 "\$SHARE_DIR/geoip.dat" "\$SHARE_DIR/geosite.dat"
     systemctl restart xray
     echo "\$(date '+%Y-%m-%d %H:%M:%S') GeoData 更新成功" >> /var/log/xray-update-geo.log
 else
@@ -104,6 +106,8 @@ install_geodata_robust() {
 
     local share_dir="/usr/local/share/xray"
     mkdir -p "$share_dir"
+    # 强制开放目录读取权限
+    chmod 755 "$share_dir"
 
     local url_ip="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
     local url_site="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
