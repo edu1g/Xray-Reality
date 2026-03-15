@@ -38,6 +38,11 @@ update_geodata() {
     echo -e "${CYAN}>>> 正在手动更新 GeoData 路由规则库...${PLAIN}"
 
     local share_dir="/usr/local/share/xray"
+    
+    # 强制保护目标目录权限
+    mkdir -p "$share_dir"
+    chmod 755 "$share_dir"
+
     local urls=(
         "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
         "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
@@ -72,7 +77,10 @@ update_geodata() {
         echo -e "校验通过，正在应用新规则..."
         mv -f "$tmp_ip"   "$share_dir/geoip.dat"
         mv -f "$tmp_site" "$share_dir/geosite.dat"
+        
+        # 确保下载后文件权限全局可读
         chmod 644 "$share_dir"/*.dat
+        
         systemctl restart xray
         echo -e "\n${GREEN}>>> GeoData 更新完成！服务已重启以加载新规则。${PLAIN}"
         UI_MESSAGE="${GREEN}GeoData 更新完成！服务已重启以加载新规则。${PLAIN}"
